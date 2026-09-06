@@ -34,6 +34,26 @@ The noVNC port is bound to loopback by default. Do not expose it directly to a
 public network; place authenticated TLS access in front of it if remote access
 is required.
 
+## Automatic repository updates
+
+The Compose stack includes an `auto-updater` service. Every five minutes by
+default it fetches `origin/master`. When the checked-out revision is behind and
+can be fast-forwarded, it pulls the repository, rebuilds `cloud-runner`, and
+recreates that service. Tracked local changes or a diverged branch cause the
+update to be skipped rather than overwritten.
+
+The updater mounts `/var/run/docker.sock`, which grants it control over the
+host Docker daemon. Enable it only for a repository and image you trust. Change
+the interval, remote, or branch with `CLOUD_UPDATE_INTERVAL_SECONDS`,
+`CLOUD_UPDATE_REMOTE`, and `CLOUD_UPDATE_BRANCH`. The updater normally reads
+the current Compose project name from its container label; set
+`CLOUD_UPDATE_PROJECT_NAME` only when the platform removes that label.
+
+TrueNAS configurations whose Compose file lives outside the repository must
+set `CLOUD_UPDATE_COMPOSE_FILE` to its mounted in-container path and mount that
+file into `auto-updater`. The repository itself must be mounted read-write at
+`/workspace`; tracked local changes intentionally block automatic updates.
+
 Compose uses `223.5.5.5` with `8.8.8.8` as a fallback because some WSL Docker
 daemons cannot forward the generated host resolver into containers. Override
 `CLOUD_DNS_PRIMARY` and `CLOUD_DNS_SECONDARY` when the deployment network

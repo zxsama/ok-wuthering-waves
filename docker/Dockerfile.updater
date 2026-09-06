@@ -1,0 +1,9 @@
+FROM docker:27-cli
+
+RUN apk add --no-cache docker-cli-compose git
+
+COPY docker/auto_update.sh /usr/local/bin/ok-ww-auto-update
+RUN sed -i 's/\r$//' /usr/local/bin/ok-ww-auto-update \
+    && chmod +x /usr/local/bin/ok-ww-auto-update
+
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/ok-ww-auto-update"]

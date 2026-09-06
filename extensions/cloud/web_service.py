@@ -360,6 +360,16 @@ def build_cloud_web_config(source: dict[str, Any], settings: CloudSettings) -> d
     return config
 
 
+def _cloud_update_status(config: dict[str, Any]) -> dict[str, object]:
+    """Return a stable no-update response for container deployments."""
+
+    return {
+        "current_version": str(config.get("version") or "dev"),
+        "versions": [],
+        "update_available": False,
+    }
+
+
 def create_cloud_web_app(
     settings: CloudSettings,
     adapter: Any,
@@ -399,6 +409,9 @@ def create_cloud_web_app(
         return await call_next(request)
 
     runtime = app.state.runtime
+    runtime.check_for_updates = lambda release_only=True: _cloud_update_status(
+        ok_instance.config
+    )
 
     smtp_settings = SmtpSettings.from_env()
     controller = CloudWebController(

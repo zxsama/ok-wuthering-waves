@@ -7,6 +7,7 @@ from extensions.cloud.models import AuthenticationRequiredError, CloudConfigurat
 from extensions.cloud.web_service import (
     CHARACTER_CODE_WEB_TAB,
     CloudWebController,
+    _cloud_update_status,
     _inject_default_web_language,
     _web_translation_catalog,
     build_cloud_web_config,
@@ -91,6 +92,14 @@ def test_web_config_keeps_upstream_tasks_and_adds_character_team_tab(tmp_path):
     assert "gui" not in result
     assert "gui_icon" not in result
     assert "update_pyappify" not in result
+
+
+def test_cloud_update_status_disables_desktop_update_checks():
+    assert _cloud_update_status({"version": "v1.0.2"}) == {
+        "current_version": "v1.0.2",
+        "versions": [],
+        "update_available": False,
+    }
 
 
 def test_default_web_language_bootstrap_preserves_saved_choice():

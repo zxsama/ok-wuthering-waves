@@ -114,6 +114,20 @@ def test_compose_has_healthcheck_and_bounded_json_logs():
     assert 'max-file: "${CLOUD_LOG_MAX_FILES:-5}"' in compose
 
 
+def test_compose_auto_updater_uses_fast_forward_and_docker_socket():
+    compose = _read("compose.yaml")
+    updater = _read("docker/auto_update.sh")
+
+    assert "docker/Dockerfile.updater" in compose
+    assert "/var/run/docker.sock:/var/run/docker.sock" in compose
+    assert ".:/workspace" in compose
+    assert "git -C \"$repository_dir\" merge --ff-only FETCH_HEAD" in updater
+    assert "status --porcelain --untracked-files=no" in updater
+    assert "--project-name \"$project_name\"" in updater
+    assert "-f \"$compose_file\" build cloud-runner" in updater
+    assert "--force-recreate cloud-runner" in updater
+
+
 def test_cloud_image_installs_pinned_web_server_dependencies():
     requirements = _read("docker/requirements-cloud.txt")
 

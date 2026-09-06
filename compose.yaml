@@ -70,5 +70,22 @@ services:
     volumes:
       - cloud-data:/data/cloud
 
+  auto-updater:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.updater
+    image: ${CLOUD_UPDATER_IMAGE:-ok-wuthering-waves-updater:dev}
+    restart: unless-stopped
+    environment:
+      CLOUD_UPDATE_BRANCH: ${CLOUD_UPDATE_BRANCH:-master}
+      CLOUD_UPDATE_COMPOSE_FILE: /workspace/compose.yaml
+      CLOUD_UPDATE_INTERVAL_SECONDS: ${CLOUD_UPDATE_INTERVAL_SECONDS:-300}
+      CLOUD_UPDATE_PROJECT_NAME: ${CLOUD_UPDATE_PROJECT_NAME:-}
+      CLOUD_UPDATE_REMOTE: ${CLOUD_UPDATE_REMOTE:-origin}
+      CLOUD_UPDATE_REPOSITORY_DIR: /workspace
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   cloud-data:
