@@ -7,7 +7,7 @@ services:
     platform: linux/amd64
     restart: "${CLOUD_RESTART_POLICY:-no}"
     environment:
-      CLOUD_COMMAND: ${CLOUD_COMMAND:-serve}
+      CLOUD_COMMAND: ${CLOUD_COMMAND:-auto}
       CLOUD_ENABLE_NOVNC: ${CLOUD_ENABLE_NOVNC:-1}
       CLOUD_NOVNC_INTERNAL_PORT: ${CLOUD_NOVNC_INTERNAL_PORT:-15980}
       CLOUD_WEB_HOST: ${CLOUD_WEB_HOST:-0.0.0.0}
@@ -47,7 +47,13 @@ services:
       test:
         - CMD-SHELL
         - >-
-          if [ "$$CLOUD_COMMAND" = "serve" ]; then
+          selected="$$CLOUD_COMMAND";
+          if [ "$$selected" = "auto" ]; then
+            selected=$$(python /app/docker/select_cloud_command.py
+            "$$OK_WW_CLOUD_DATA_DIR"
+            "$${OK_WW_CLOUD_URL:-https://mc.kurogames.com/cloud/}");
+          fi;
+          if [ "$$selected" = "serve" ]; then
             curl -fsS "http://127.0.0.1:$${CLOUD_WEB_PORT:-8765}/healthz" >/dev/null;
           else
             kill -0 1;

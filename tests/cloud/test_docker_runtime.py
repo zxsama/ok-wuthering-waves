@@ -70,14 +70,15 @@ def test_compose_does_not_require_an_interactive_terminal():
     assert "tty:" not in compose
 
 
-def test_compose_defaults_to_long_running_web_management_on_uncommon_ports():
+def test_compose_defaults_to_automatic_enrollment_then_web_management():
     compose = _read("compose.yaml")
     environment = _read(".env.cloud.example")
     entrypoint = _read("docker/entrypoint.sh")
 
-    assert "CLOUD_COMMAND: ${CLOUD_COMMAND:-serve}" in compose
-    assert 'command_name="${CLOUD_COMMAND:-serve}"' in entrypoint
-    assert "CLOUD_COMMAND=serve" in environment
+    assert "CLOUD_COMMAND: ${CLOUD_COMMAND:-auto}" in compose
+    assert 'command_name="${CLOUD_COMMAND:-auto}"' in entrypoint
+    assert "CLOUD_COMMAND=auto" in environment
+    assert 'if [ "$command_name" = "auto" ]' in entrypoint
     assert '127.0.0.1:${CLOUD_WEB_HOST_PORT:-17880}:${CLOUD_WEB_PORT:-8765}' in compose
     assert (
         '127.0.0.1:${CLOUD_NOVNC_PORT:-15980}:'

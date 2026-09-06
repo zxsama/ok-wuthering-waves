@@ -5,10 +5,16 @@ display_number="${DISPLAY:-:99}"
 data_dir="${OK_WW_CLOUD_DATA_DIR:-/data/cloud}"
 adapter="${OK_WW_CLOUD_ADAPTER:-docker.playwright_adapter:create_playwright_adapter}"
 task_runner="${OK_WW_CLOUD_TASK_RUNNER:-extensions.cloud.task_runner:create_daily_task_runner}"
-command_name="${CLOUD_COMMAND:-serve}"
+command_name="${CLOUD_COMMAND:-auto}"
 
 mkdir -p "$data_dir"
 export DISPLAY="$display_number"
+
+if [ "$command_name" = "auto" ]; then
+    command_name=$(python /app/docker/select_cloud_command.py \
+        "$data_dir" "${OK_WW_CLOUD_URL:-https://mc.kurogames.com/cloud/}")
+    echo "CLOUD_COMMAND auto selected: $command_name"
+fi
 
 display_id=${DISPLAY#:}
 display_id=${display_id%%.*}
@@ -72,7 +78,7 @@ case "$command_name" in
             --port "${CLOUD_WEB_PORT:-8765}"
         ;;
     *)
-        echo "CLOUD_COMMAND must be enroll, run-once, schedule, or serve" >&2
+        echo "CLOUD_COMMAND must be auto, enroll, run-once, schedule, or serve" >&2
         exit 64
         ;;
 esac

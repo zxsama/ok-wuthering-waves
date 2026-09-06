@@ -48,11 +48,11 @@
 Copy-Item -LiteralPath '.env.cloud.example' -Destination '.env.cloud'
 ```
 
-首次登录临时使用以下配置：
+新部署保持自动模式：
 
 ```dotenv
-CLOUD_COMMAND=enroll
-CLOUD_RESTART_POLICY=no
+CLOUD_COMMAND=auto
+CLOUD_RESTART_POLICY=unless-stopped
 CLOUD_ENABLE_NOVNC=1
 CLOUD_NOVNC_PORT=15980
 CLOUD_NOVNC_INTERNAL_PORT=15980
@@ -64,13 +64,13 @@ CLOUD_NOVNC_INTERNAL_PORT=15980
 docker compose --env-file .env.cloud up --build
 ```
 
-打开 <http://127.0.0.1:15980/vnc.html>，在容器浏览器中完成人工登录。程序识别到已认证页面后会保存注册标记并正常退出；完整浏览器 profile 会继续保存在 `cloud-data` 卷中。
+打开 <http://127.0.0.1:15980/vnc.html>，在容器浏览器中完成人工登录。自动模式在没有有效注册标记时进入注册流程；程序识别到已认证页面后会保存标记并正常退出，`unless-stopped` 随即重启容器并自动切换到常驻管理页面。完整浏览器 profile 会继续保存在 `cloud-data` 卷中，无需修改环境变量。
 
 持久化的不只是 Cookie，因此不要只复制 Cookie 文件代替首次初始化。
 
 ## 3. 单次完整验证
 
-编辑 `.env.cloud`：
+保持 `.env.cloud`：
 
 ```dotenv
 CLOUD_COMMAND=run-once
@@ -90,7 +90,7 @@ docker compose --env-file .env.cloud up
 编辑 `.env.cloud`：
 
 ```dotenv
-CLOUD_COMMAND=serve
+CLOUD_COMMAND=auto
 CLOUD_RESTART_POLICY=unless-stopped
 CLOUD_WEB_HOST=0.0.0.0
 CLOUD_WEB_PORT=8765
@@ -121,7 +121,7 @@ docker compose --env-file .env.cloud up --build -d
 
 首次登录完成后，如果不需要随时查看画面，可将 `CLOUD_ENABLE_NOVNC=0` 后重新创建容器；管理页面不受影响，需要排障时再临时开启。
 
-旧的 `CLOUD_COMMAND=schedule`、`RUN_AT`、`TZ` 与 `MISSED_WINDOW_MINUTES` 仍保留用于兼容或诊断。仅在旧 `schedule` 模式下，调度器才直接读取这些环境变量并每天启动一个全新的 `run-once` 子进程。新部署应使用 `CLOUD_COMMAND=serve`，并在页面中统一管理所有计划。
+旧的 `CLOUD_COMMAND=schedule`、`RUN_AT`、`TZ` 与 `MISSED_WINDOW_MINUTES` 仍保留用于兼容或诊断。仅在旧 `schedule` 模式下，调度器才直接读取这些环境变量并每天启动一个全新的 `run-once` 子进程。新部署应使用 `CLOUD_COMMAND=auto`，并在页面中统一管理所有计划。
 
 ## 5. 登录失效邮件
 

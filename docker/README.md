@@ -22,14 +22,13 @@ SMTP setup and troubleshooting, see
 
 ## First login
 
-1. Copy `.env.cloud.example` to `.env.cloud`.
-2. Temporarily set `CLOUD_COMMAND=enroll` and run `docker compose --env-file
-   .env.cloud up --build`.
+1. Copy `.env.cloud.example` to `.env.cloud`; keep `CLOUD_COMMAND=auto`.
+2. Run `docker compose --env-file .env.cloud up --build`.
 3. Open `http://127.0.0.1:15980/vnc.html` and complete login manually.
-4. Stop the container after enrollment succeeds. The named volume retains the
-   complete browser profile, including cookies and browser storage.
-5. Restore `CLOUD_COMMAND=serve`, then start Compose in the background. Open
-   `http://127.0.0.1:17880` for normal management.
+4. Enrollment writes its marker and exits. `unless-stopped` restarts the
+   container, and auto mode then selects `serve` while retaining the complete
+   browser profile, including cookies and browser storage.
+5. Open `http://127.0.0.1:17880` for normal management.
 
 The noVNC port is bound to loopback by default. Do not expose it directly to a
 public network; place authenticated TLS access in front of it if remote access
@@ -110,7 +109,7 @@ on port 587.
 The image defaults to the long-running management service:
 
 ```dotenv
-CLOUD_COMMAND=serve
+CLOUD_COMMAND=auto
 CLOUD_WEB_HOST_PORT=17880
 CLOUD_NOVNC_PORT=15980
 CLOUD_RESTART_POLICY=unless-stopped
