@@ -334,7 +334,17 @@ def test_compatibility_wheel_removes_only_declared_cloud_unused_dependencies(
         archive.writestr(
             patch_ok_script_wheel.OK_INIT_PATH,
             b"'windows_graphics_available': "
-            b"('ok.util.window', 'windows_graphics_available'),\n",
+            b"('ok.util.window', 'windows_graphics_available'),\n"
+            b"        try:\n"
+            b"            import ctypes\n"
+            b"            # Set DPI Awareness (Windows 10 and 8)\n"
+            b"            errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(2)\n"
+            b"            logger.info(f'SetProcessDpiAwareness {errorCode}')\n"
+            b"            if self.debug:\n"
+            b"                import win32api\n"
+            b"                win32api.SetConsoleCtrlHandler(self.console_handler, True)\n"
+            b"        except Exception as e:\n"
+            b"            logger.error(f'SetProcessDpiAwareness error', e)\n",
         )
         archive.writestr(
             patch_ok_script_wheel.WINDOW_UTIL_PATH,
@@ -388,6 +398,9 @@ def test_compatibility_wheel_removes_only_declared_cloud_unused_dependencies(
         assert (
             b"('ok.linux_cloud_compat', 'windows_graphics_available')"
             in archive.read(patch_ok_script_wheel.OK_INIT_PATH)
+        )
+        assert b"if sys.platform == 'win32':" in archive.read(
+            patch_ok_script_wheel.OK_INIT_PATH
         )
         assert (
             archive.read(patch_ok_script_wheel.LINUX_COMPAT_PATH)

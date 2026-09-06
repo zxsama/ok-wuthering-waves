@@ -66,11 +66,36 @@ def windows_graphics_available():\n
 
 def _patch_ok_init(raw: bytes) -> bytes:
     source = raw.decode("utf-8")
-    old = "'windows_graphics_available': ('ok.util.window', 'windows_graphics_available'),"
-    new = "'windows_graphics_available': ('ok.linux_cloud_compat', 'windows_graphics_available'),"
-    if source.count(old) != 1:
+    old_mapping = "'windows_graphics_available': ('ok.util.window', 'windows_graphics_available'),"
+    new_mapping = "'windows_graphics_available': ('ok.linux_cloud_compat', 'windows_graphics_available'),"
+    old_dpi = """        try:
+            import ctypes
+            # Set DPI Awareness (Windows 10 and 8)
+            errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            logger.info(f'SetProcessDpiAwareness {errorCode}')
+            if self.debug:
+                import win32api
+                win32api.SetConsoleCtrlHandler(self.console_handler, True)
+        except Exception as e:
+            logger.error(f'SetProcessDpiAwareness error', e)
+"""
+    new_dpi = """        if sys.platform == 'win32':
+            try:
+                import ctypes
+                # Set DPI Awareness (Windows 10 and 8)
+                errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(2)
+                logger.info(f'SetProcessDpiAwareness {errorCode}')
+                if self.debug:
+                    import win32api
+                    win32api.SetConsoleCtrlHandler(self.console_handler, True)
+            except Exception as e:
+                logger.error(f'SetProcessDpiAwareness error', e)
+"""
+    if source.count(old_mapping) != 1:
         raise RuntimeError("unexpected ok/__init__.py windows graphics mapping")
-    return source.replace(old, new).encode("utf-8")
+    if source.count(old_dpi) != 1:
+        raise RuntimeError("unexpected ok/__init__.py DPI initialization")
+    return source.replace(old_mapping, new_mapping).replace(old_dpi, new_dpi).encode("utf-8")
 
 
 def _patch_window_util(raw: bytes) -> bytes:
