@@ -53,11 +53,11 @@ services:
             "$$OK_WW_CLOUD_DATA_DIR"
             "$${OK_WW_CLOUD_URL:-https://mc.kurogames.com/cloud/}");
           fi;
-          if [ "$$selected" = "serve" ]; then
-            curl -fsS "http://127.0.0.1:$${CLOUD_WEB_PORT:-8765}/healthz" >/dev/null;
-          else
-            kill -0 1;
-          fi
+          python /app/docker/runtime_healthcheck.py
+          "$$selected"
+          "$${CLOUD_WEB_PORT:-8765}"
+          "$${CLOUD_ENABLE_NOVNC:-1}"
+          "$${CLOUD_NOVNC_INTERNAL_PORT:-15980}"
       interval: 30s
       timeout: 5s
       start_period: 60s

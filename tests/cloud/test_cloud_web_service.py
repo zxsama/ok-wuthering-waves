@@ -8,6 +8,7 @@ from extensions.cloud.web_service import (
     CHARACTER_CODE_WEB_TAB,
     CloudWebController,
     _cloud_update_status,
+    _disable_cloud_update_checks,
     _inject_default_web_language,
     _web_translation_catalog,
     build_cloud_web_config,
@@ -100,6 +101,34 @@ def test_cloud_update_status_disables_desktop_update_checks():
         "versions": [],
         "update_available": False,
     }
+
+
+def test_cloud_runtime_reports_updates_as_unsupported():
+    runtime = SimpleNamespace(
+        about=lambda: {"update_supported": True, "name": "OK-WW"},
+        check_for_updates=lambda release_only=True: pytest.fail(
+            "desktop update checker must not run in Docker"
+        ),
+    )
+
+    _disable_cloud_update_checks(runtime, {"version": "v1.0.2"})
+
+    assert runtime.about() == {"update_supported": False, "name": "OK-WW"}
+    assert runtime.check_for_updates() == {
+        "current_version": "v1.0.2",
+        "versions": [],
+        "update_available": False,
+    }
+
+
+def test_cloud_game_button_does_not_cover_header_actions():
+    result = _inject_default_web_language(
+        '<html><script type="module" src="/static/app.js"></script></html>',
+        "zh_CN",
+    )
+
+    assert "right:20px;bottom:20px" in result
+    assert "right:20px;top:14px" not in result
 
 
 def test_default_web_language_bootstrap_preserves_saved_choice():

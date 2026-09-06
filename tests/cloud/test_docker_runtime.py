@@ -108,10 +108,33 @@ def test_image_normalizes_shell_script_line_endings():
 def test_compose_has_healthcheck_and_bounded_json_logs():
     compose = _read("compose.yaml")
 
-    assert 'http://127.0.0.1:$${CLOUD_WEB_PORT:-8765}/healthz' in compose
+    assert "python /app/docker/runtime_healthcheck.py" in compose
     assert "driver: json-file" in compose
     assert "max-size: ${CLOUD_LOG_MAX_SIZE:-10m}" in compose
     assert 'max-file: "${CLOUD_LOG_MAX_FILES:-5}"' in compose
+
+
+def test_compose_smoke_checks_container_updates_and_vnc_transport():
+    smoke = _read("docker/compose_smoke_test.sh")
+
+    assert "CLOUD_COMMAND=serve docker compose up -d cloud-runner" in smoke
+    assert "http://127.0.0.1:17880/api/about" in smoke
+    assert '"update_supported":false' in smoke
+    assert "http://127.0.0.1:17880/api/updates" in smoke
+    assert '"update_available":false' in smoke
+    assert "ws://127.0.0.1:15980/websockify" in smoke
+    assert "RFB 003.008" in smoke
+    assert "SetProcessDpiAwareness error" in smoke
+    assert "calling pyappify.get_version_list" in smoke
+
+
+def test_runtime_healthcheck_covers_display_vnc_and_management_api():
+    healthcheck = _read("docker/runtime_healthcheck.py")
+
+    assert '"xdpyinfo"' in healthcheck
+    assert "_check_tcp(5900)" in healthcheck
+    assert "_check_tcp(novnc_port)" in healthcheck
+    assert 'f"http://127.0.0.1:{web_port}/healthz"' in healthcheck
 
 
 def test_compose_auto_updater_uses_fast_forward_and_docker_socket():

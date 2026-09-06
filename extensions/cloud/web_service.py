@@ -150,7 +150,7 @@ def _inject_default_web_language(index_html: str, language: str) -> str:
         "document.addEventListener('DOMContentLoaded',()=>{"
         "const button=document.createElement('button');button.id='okww-cloud-game-control';"
         "button.type='button';button.textContent='Start Cloud Game';"
-        "button.style.cssText='position:fixed;right:20px;top:14px;z-index:2147483647;"
+        "button.style.cssText='position:fixed;right:20px;bottom:20px;z-index:2147483647;"
         "padding:8px 14px;border:0;border-radius:8px;background:#2563eb;color:white;"
         "font:600 14px sans-serif;cursor:pointer;box-shadow:0 2px 8px #0004';"
         "button.addEventListener('click',okwwToggleCloudGame);document.body.appendChild(button);"
@@ -370,6 +370,16 @@ def _cloud_update_status(config: dict[str, Any]) -> dict[str, object]:
     }
 
 
+def _disable_cloud_update_checks(runtime: Any, config: dict[str, Any]) -> None:
+    original_about = runtime.about
+
+    def cloud_about() -> dict[str, Any]:
+        return {**original_about(), "update_supported": False}
+
+    runtime.about = cloud_about
+    runtime.check_for_updates = lambda release_only=True: _cloud_update_status(config)
+
+
 def create_cloud_web_app(
     settings: CloudSettings,
     adapter: Any,
@@ -409,9 +419,7 @@ def create_cloud_web_app(
         return await call_next(request)
 
     runtime = app.state.runtime
-    runtime.check_for_updates = lambda release_only=True: _cloud_update_status(
-        ok_instance.config
-    )
+    _disable_cloud_update_checks(runtime, ok_instance.config)
 
     smtp_settings = SmtpSettings.from_env()
     controller = CloudWebController(

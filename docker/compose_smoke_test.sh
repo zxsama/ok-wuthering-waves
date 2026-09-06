@@ -26,7 +26,7 @@ docker compose build cloud-runner
 compose_started=1
 docker compose run --rm --no-deps --entrypoint /bin/sh cloud-runner \
     /app/docker/browser_smoke_test.sh
-docker compose up -d cloud-runner
+CLOUD_COMMAND=serve docker compose up -d cloud-runner
 
 ready=0
 for _attempt in $(seq 1 60); do
@@ -46,8 +46,35 @@ curl -fsS http://127.0.0.1:17880/api/tasks | grep -q 'DailyTask'
 curl -fsS http://127.0.0.1:17880/api/schedule | grep -q 'src.task.DailyTask.DailyTask'
 curl -fsS http://127.0.0.1:17880/api/task-tabs | grep -q 'character-code'
 curl -fsS http://127.0.0.1:17880/task-tabs/character-code/assets/index.js >/dev/null
+curl -fsS http://127.0.0.1:17880/api/about \
+    | grep -q '"update_supported":false'
+curl -fsS http://127.0.0.1:17880/api/updates \
+    | grep -q '"update_available":false'
 curl -fsS http://127.0.0.1:15980/vnc.html >/dev/null
+docker compose exec -T cloud-runner python - <<'PY'
+import asyncio
+
+import websockets
+
+
+async def main():
+    async with websockets.connect(
+        "ws://127.0.0.1:15980/websockify",
+        subprotocols=["binary"],
+        open_timeout=10,
+    ) as websocket:
+        banner = await asyncio.wait_for(websocket.recv(), timeout=5)
+        assert banner == b"RFB 003.008\n", banner
+
+
+asyncio.run(main())
+PY
 docker compose exec -T cloud-runner python /app/docker/management_ui_smoke_test.py
+if docker compose logs --no-color cloud-runner \
+    | grep -Eq 'SetProcessDpiAwareness error|calling pyappify.get_version_list'; then
+    docker compose logs --tail=160 cloud-runner >&2
+    exit 73
+fi
 docker compose restart cloud-runner
 
 ready=0
@@ -63,6 +90,6 @@ if [ "$ready" != "1" ]; then
     exit 72
 fi
 grep -q '"status":"ok"' /tmp/ok-ww-health-restarted.json
-printf '%s\n' 'docker-web-smoke health=ok tasks=ok schedule=ok character-code=ok novnc=ok'
+printf '%s\n' 'docker-web-smoke health=ok tasks=ok schedule=ok character-code=ok updates=ok novnc=ok'
 docker compose down --volumes --remove-orphans
 compose_started=0
