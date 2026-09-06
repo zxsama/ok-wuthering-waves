@@ -134,7 +134,8 @@ def _inject_default_web_language(index_html: str, language: str) -> str:
         "async function okwwRefreshCloudGame(){"
         "const button=document.getElementById('okww-cloud-game-control');if(!button)return;"
         "try{const response=await fetch('/api/cloud-game');const state=await response.json();"
-        "button.disabled=state.task_running;button.dataset.running=String(state.running);"
+        "button.disabled=state.task_running&&!state.running;"
+        "button.dataset.running=String(state.running);"
         "button.textContent=state.running?'Stop Cloud Game':"
         "(state.busy?'Starting Cloud Game...':'Start Cloud Game');"
         "button.title=state.error||state.state||'';okwwTranslateRoot(button);"
@@ -234,7 +235,11 @@ class CloudWebController:
 
     def manual_game_status(self) -> dict[str, object]:
         with self._lock:
-            starting = self._manual_game_thread is not None and self._manual_game_thread.is_alive()
+            starting = (
+                not self._manual_game_stop_requested
+                and self._manual_game_thread is not None
+                and self._manual_game_thread.is_alive()
+            )
             state = str(self.session.state)
             running = starting or state not in {"new", "closed", "failed"}
             return {
@@ -272,10 +277,15 @@ class CloudWebController:
 
     def stop_game_manually(self) -> dict[str, object]:
         with self._lock:
-            if self._active_task is not None:
-                raise RuntimeError("Cannot close the cloud game while a task is running")
             self._manual_game_stop_requested = True
+            task_running = self._active_task is not None
+
+        if task_running:
+            self.stop_task()
+        else:
             self.session.stop()
+
+        with self._lock:
             self._manual_game_error = None
         return self.manual_game_status()
 

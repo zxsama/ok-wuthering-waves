@@ -53,6 +53,7 @@ RUN python -m pip download \
 
 COPY . /app
 RUN python /app/docker/smoke_test.py \
+    && sed -i 's/\r$//' /app/docker/*.sh \
     && chmod +x /app/docker/entrypoint.sh \
     && useradd --create-home --uid 10001 cloud \
     && mkdir -p /data/cloud /tmp/.X11-unix \

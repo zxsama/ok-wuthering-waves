@@ -99,6 +99,12 @@ def test_image_installs_emoji_font_for_task_icons():
     assert "fonts-noto-color-emoji" in _read("docker/Dockerfile")
 
 
+def test_image_normalizes_shell_script_line_endings():
+    dockerfile = _read("docker/Dockerfile")
+
+    assert "sed -i 's/\\r$//' /app/docker/*.sh" in dockerfile
+
+
 def test_compose_has_healthcheck_and_bounded_json_logs():
     compose = _read("compose.yaml")
 

@@ -249,3 +249,33 @@ def test_manual_cloud_game_start_and_stop():
     assert running["running"] is True
     assert stopped["running"] is False
     assert session.stops == 1
+
+
+def test_manual_cloud_game_stop_interrupts_active_task():
+    task = object()
+    runtime, _runtime_starts, starts, _actions, stops, _closes = make_runtime(task)
+    session = FakeSession()
+    controller = CloudWebController(runtime, session, FakeProfile(False))
+    controller.install()
+    runtime.start_task("ForgeryTask")
+
+    stopped = controller.stop_game_manually()
+
+    assert starts == ["ForgeryTask"]
+    assert stops == [True]
+    assert session.stops == 1
+    assert stopped["running"] is False
+    assert stopped["task_running"] is False
+
+
+def test_manual_cloud_game_reports_stopped_while_start_thread_exits():
+    runtime, *_ = make_runtime(object())
+    session = FakeSession()
+    controller = CloudWebController(runtime, session, FakeProfile(False))
+    controller._manual_game_stop_requested = True
+    controller._manual_game_thread = SimpleNamespace(is_alive=lambda: True)
+
+    status = controller.manual_game_status()
+
+    assert status["running"] is False
+    assert status["busy"] is False
