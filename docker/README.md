@@ -36,7 +36,7 @@ is required.
 
 ## Automatic repository updates
 
-The Compose stack includes an `auto-updater` service. Every five minutes by
+The Compose stack includes an `auto-updater` service. Every 24 hours by
 default it fetches `origin/master`. When the checked-out revision is behind and
 can be fast-forwarded, it pulls the repository, rebuilds `cloud-runner`, and
 recreates that service. Tracked local changes or a diverged branch cause the

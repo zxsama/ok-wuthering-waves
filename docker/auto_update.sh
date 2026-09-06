@@ -5,7 +5,7 @@ repository_dir="${CLOUD_UPDATE_REPOSITORY_DIR:-/workspace}"
 compose_file="${CLOUD_UPDATE_COMPOSE_FILE:-/workspace/compose.yaml}"
 remote_name="${CLOUD_UPDATE_REMOTE:-origin}"
 branch_name="${CLOUD_UPDATE_BRANCH:-master}"
-interval_seconds="${CLOUD_UPDATE_INTERVAL_SECONDS:-300}"
+interval_seconds="${CLOUD_UPDATE_INTERVAL_SECONDS:-86400}"
 project_name="${CLOUD_UPDATE_PROJECT_NAME:-}"
 
 case "$interval_seconds" in
