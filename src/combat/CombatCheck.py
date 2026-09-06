@@ -1,8 +1,6 @@
 import re
 import time
 
-import win32api
-
 from ok import find_boxes_by_name, Logger, calculate_color_percentage
 from ok import find_color_rectangles, get_mask_in_color_range, is_pure_black
 from src import text_white_color
@@ -220,14 +218,25 @@ class CombatCheck(BaseWWTask):
         if not levitator:
             self.send_key_up(self.key_config.get('Wheel Key'))
             raise Exception('no levitator tool in the tab wheel!')
-        old = win32api.GetCursorPos()
+        old_cursor_pos = None
+        browser_interaction = self.is_browser()
+        if not browser_interaction:
+            # Native capture coordinates need conversion to the desktop cursor
+            # position.  Browser interaction already moved its page pointer,
+            # and importing win32api there would make the cloud runner
+            # unusable on Linux.
+            import win32api
+
+            old_cursor_pos = win32api.GetCursorPos()
         self.move(levitator.x, levitator.y)
-        abs_pos = self.executor.interaction.capture.get_abs_cords(levitator.x, levitator.y)
-        win32api.SetCursorPos(abs_pos)
+        if not browser_interaction:
+            abs_pos = self.executor.interaction.capture.get_abs_cords(levitator.x, levitator.y)
+            win32api.SetCursorPos(abs_pos)
         self.sleep(0.1)
         self.send_key_up(self.key_config.get('Wheel Key'))
         self.sleep(0.2)
-        win32api.SetCursorPos(old)
+        if old_cursor_pos is not None:
+            win32api.SetCursorPos(old_cursor_pos)
         if not self.wait_feature('edge_levitator', threshold=0.6, time_out=1):
             if self.has_char(Roccia):
                 if self.find_one('levitator_roccia', threshold=0.6):

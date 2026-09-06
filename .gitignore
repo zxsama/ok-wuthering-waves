@@ -6,6 +6,13 @@ working/
 update/
 tesseract
 cache/
+data/cloud/
+secrets/
+.env.cloud
+.tmp-cloud-*/
+.codex/
+.serena/
+.pytest_cache/
 models
 fonts
 # Byte-compiled / optimized / DLL files

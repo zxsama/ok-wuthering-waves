@@ -1,0 +1,12 @@
+services:
+  cloud-runner:
+    environment:
+      OK_WW_SMTP_ENABLED: "true"
+      OK_WW_SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+    secrets:
+      - source: smtp_password
+        target: smtp_password
+
+secrets:
+  smtp_password:
+    file: ${OK_WW_SMTP_PASSWORD_SOURCE:?Set OK_WW_SMTP_PASSWORD_SOURCE to the SMTP password file}

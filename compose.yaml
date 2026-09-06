@@ -1,0 +1,68 @@
+services:
+  cloud-runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: ${CLOUD_IMAGE:-ok-wuthering-waves-cloud:dev}
+    platform: linux/amd64
+    restart: "${CLOUD_RESTART_POLICY:-no}"
+    environment:
+      CLOUD_COMMAND: ${CLOUD_COMMAND:-serve}
+      CLOUD_ENABLE_NOVNC: ${CLOUD_ENABLE_NOVNC:-1}
+      CLOUD_NOVNC_INTERNAL_PORT: ${CLOUD_NOVNC_INTERNAL_PORT:-15980}
+      CLOUD_WEB_HOST: ${CLOUD_WEB_HOST:-0.0.0.0}
+      CLOUD_WEB_PORT: ${CLOUD_WEB_PORT:-8765}
+      CLOUD_SCREEN: ${CLOUD_SCREEN:-1280x720x24}
+      OK_WW_CLOUD_ADAPTER: ${OK_WW_CLOUD_ADAPTER:-docker.playwright_adapter:create_playwright_adapter}
+      OK_WW_CLOUD_BROWSER_VISIBLE: ${OK_WW_CLOUD_BROWSER_VISIBLE:-true}
+      OK_WW_CLOUD_CONFIG_DIR: /data/cloud/configs
+      OK_WW_CLOUD_DATA_DIR: /data/cloud
+      OK_WW_CLOUD_HEADLESS: ${OK_WW_CLOUD_HEADLESS:-0}
+      OK_WW_CLOUD_LOGIN_TIMEOUT: ${OK_WW_CLOUD_LOGIN_TIMEOUT:-900}
+      OK_WW_CLOUD_QUEUE: ${OK_WW_CLOUD_QUEUE:-normal}
+      OK_WW_CLOUD_QUEUE_TIMEOUT: ${OK_WW_CLOUD_QUEUE_TIMEOUT:-7200}
+      OK_WW_CLOUD_TASK_RUNNER: ${OK_WW_CLOUD_TASK_RUNNER:-extensions.cloud.task_runner:create_daily_task_runner}
+      OK_WW_WEB_DEFAULT_LANGUAGE: ${OK_WW_WEB_DEFAULT_LANGUAGE:-zh_CN}
+      OK_WW_SMTP_ENABLED: ${OK_WW_SMTP_ENABLED:-false}
+      OK_WW_SMTP_HOST: ${OK_WW_SMTP_HOST:-}
+      OK_WW_SMTP_PORT: ${OK_WW_SMTP_PORT:-587}
+      OK_WW_SMTP_USERNAME: ${OK_WW_SMTP_USERNAME:-}
+      OK_WW_SMTP_SENDER: ${OK_WW_SMTP_SENDER:-}
+      OK_WW_SMTP_RECIPIENT: ${OK_WW_SMTP_RECIPIENT:-}
+      OK_WW_SMTP_USE_TLS: ${OK_WW_SMTP_USE_TLS:-true}
+      OK_WW_SMTP_USE_SSL: ${OK_WW_SMTP_USE_SSL:-false}
+      RUN_AT: ${RUN_AT:-04:00}
+      MISSED_WINDOW_MINUTES: ${MISSED_WINDOW_MINUTES:-120}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "127.0.0.1:${CLOUD_WEB_HOST_PORT:-17880}:${CLOUD_WEB_PORT:-8765}"
+      - "127.0.0.1:${CLOUD_NOVNC_PORT:-15980}:${CLOUD_NOVNC_INTERNAL_PORT:-15980}"
+    dns:
+      - ${CLOUD_DNS_PRIMARY:-223.5.5.5}
+      - ${CLOUD_DNS_SECONDARY:-8.8.8.8}
+    shm_size: ${CLOUD_SHM_SIZE:-1gb}
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          if [ "$$CLOUD_COMMAND" = "serve" ]; then
+            curl -fsS "http://127.0.0.1:$${CLOUD_WEB_PORT:-8765}/healthz" >/dev/null;
+          else
+            kill -0 1;
+          fi
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: ${CLOUD_LOG_MAX_SIZE:-10m}
+        max-file: "${CLOUD_LOG_MAX_FILES:-5}"
+    volumes:
+      - cloud-data:/data/cloud
+
+volumes:
+  cloud-data:

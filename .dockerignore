@@ -1,0 +1,49 @@
+.git
+.github
+.venv
+.pytest_cache
+.tmp-cloud-*
+.serena
+.codex
+.env
+.env.*
+**/.env
+**/.env.*
+**/*.env
+**/*.env.*
+**/__pycache__
+**/*.py[cod]
+*.egg-info
+build
+cache
+click_screenshots
+configs
+data
+dist
+downloads
+logs
+screenshots
+secrets
+**/secrets
+**/*.secret
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/browser-profile
+**/Cookies
+**/Cookies-journal
+**/Login Data
+**/Login Data-journal
+**/Local State
+**/Local Storage
+**/IndexedDB
+**/Session Storage
+**/Sessions
+**/Web Data
+**/Web Data-journal
+site
+tests
+updates
+working
+.cloud_probe.py

@@ -86,6 +86,15 @@
 
 ---
 
+## ☁️ Docker Compose 云游戏（实验性）
+
+项目支持在 Linux Docker 容器中打开云·鸣潮网页端，持久化首次人工登录状态，并按计划执行完整每日任务。支持 noVNC 首次登录、普通队列等待、每日定时运行和登录失效中文邮件提醒。
+
+- [Docker Compose 部署指南](docs/zh-CN/docker-cloud.md)
+- [云游戏开发与验证记录](docs/cloud-development.md)
+
+当前镜像面向 `linux/amd64`，仅适用于网页云游戏，不包含 Windows 本地游戏客户端。
+
 ## 💻 开发者专区
 
 ### 从源码运行 (Python)
