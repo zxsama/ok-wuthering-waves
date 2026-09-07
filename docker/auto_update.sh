@@ -5,6 +5,7 @@ repository_dir="${CLOUD_UPDATE_REPOSITORY_DIR:-/workspace}"
 compose_file="${CLOUD_UPDATE_COMPOSE_FILE:-/workspace/compose.yaml}"
 remote_name="${CLOUD_UPDATE_REMOTE:-origin}"
 branch_name="${CLOUD_UPDATE_BRANCH:-master}"
+autocrlf="${CLOUD_UPDATE_AUTOCRLF:-}"
 interval_seconds="${CLOUD_UPDATE_INTERVAL_SECONDS:-86400}"
 poll_seconds="${CLOUD_UPDATE_POLL_SECONDS:-1}"
 health_timeout_seconds="${CLOUD_UPDATE_HEALTH_TIMEOUT_SECONDS:-240}"
@@ -44,6 +45,14 @@ if [ ! -f "$compose_file" ]; then
 fi
 
 git config --global --add safe.directory "$repository_dir"
+case "$autocrlf" in
+    '') ;;
+    true|false|input) git -C "$repository_dir" config core.autocrlf "$autocrlf" ;;
+    *)
+        echo "CLOUD_UPDATE_AUTOCRLF must be true, false, input, or empty" >&2
+        exit 64
+        ;;
+esac
 mkdir -p "$control_dir"
 
 write_control() {

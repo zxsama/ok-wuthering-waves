@@ -149,6 +149,8 @@ def test_compose_auto_updater_uses_fast_forward_and_docker_socket():
     assert ".:/workspace" in compose
     assert "git -C \"$repository_dir\" merge --ff-only FETCH_HEAD" in updater
     assert "status --porcelain --untracked-files=no" in updater
+    assert 'autocrlf="${CLOUD_UPDATE_AUTOCRLF:-}"' in updater
+    assert 'git -C "$repository_dir" config core.autocrlf "$autocrlf"' in updater
     assert "--project-name \"$project_name\"" in updater
     assert '-f "$repository_dir/docker/Dockerfile"' in updater
     assert '"$image_name" "$repository_dir"' in updater

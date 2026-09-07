@@ -53,6 +53,8 @@ The updater mounts `/var/run/docker.sock`, which grants it control over the
 host Docker daemon. Enable it only for a repository and image you trust. Change
 the interval, remote, or branch with `CLOUD_UPDATE_INTERVAL_SECONDS`,
 `CLOUD_UPDATE_POLL_SECONDS`, `CLOUD_UPDATE_REMOTE`, and `CLOUD_UPDATE_BRANCH`.
+If the repository is shared with a Windows checkout that uses CRLF files, set
+`CLOUD_UPDATE_AUTOCRLF=true` so the Linux updater uses the same normalization.
 The updater normally reads
 the current Compose project name from its container label; set
 `CLOUD_UPDATE_PROJECT_NAME` only when the platform removes that label.
