@@ -2,6 +2,8 @@ FROM docker:27-cli
 
 RUN apk add --no-cache docker-cli-compose git
 
+RUN mkdir -p /run/ok-ww-update && chown 10001:10001 /run/ok-ww-update
+
 COPY docker/auto_update.sh /usr/local/bin/ok-ww-auto-update
 RUN sed -i 's/\r$//' /usr/local/bin/ok-ww-auto-update \
     && chmod +x /usr/local/bin/ok-ww-auto-update

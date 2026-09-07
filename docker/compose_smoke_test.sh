@@ -50,6 +50,12 @@ curl -fsS http://127.0.0.1:17880/api/about \
     | grep -q '"update_supported":false'
 curl -fsS http://127.0.0.1:17880/api/updates \
     | grep -q '"update_available":false'
+curl -fsS http://127.0.0.1:17880/api/docker-update \
+    | grep -q '"current_version":"v1.0.7"'
+if curl -fsS -X POST http://127.0.0.1:17880/api/docker-update >/dev/null 2>&1; then
+    echo 'Docker update endpoint accepted a request without confirmation' >&2
+    exit 74
+fi
 curl -fsS http://127.0.0.1:15980/vnc.html >/dev/null
 docker compose exec -T cloud-runner python - <<'PY'
 import asyncio

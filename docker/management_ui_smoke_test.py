@@ -31,6 +31,11 @@ def main() -> None:
         assert page.locator("html").get_attribute("lang") == "zh-CN"
         for label in ("任务", "角色代码", "计划任务"):
             assert label in body_text
+        assert page.get_by_role("button", name="启动云游戏", exact=True).is_visible()
+        assert page.get_by_role("button", name="更新 Git / Docker", exact=True).is_visible()
+        version = page.locator("#okww-docker-version")
+        assert version.is_visible()
+        assert version.evaluate("node => getComputedStyle(node).position") == "absolute"
 
         page.get_by_role("button", name="任务", exact=True).click(timeout=5_000)
         page.wait_for_timeout(500)

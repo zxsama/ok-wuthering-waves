@@ -7,6 +7,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:99
 
 ARG OK_SCRIPT_VERSION=2.0.7b1
+ARG OK_WW_BUILD_VERSION=dev
+ARG OK_WW_BUILD_REVISION=unknown
+
+ENV OK_WW_BUILD_VERSION=${OK_WW_BUILD_VERSION} \
+    OK_WW_BUILD_REVISION=${OK_WW_BUILD_REVISION}
+
+LABEL org.opencontainers.image.version=${OK_WW_BUILD_VERSION} \
+      org.opencontainers.image.revision=${OK_WW_BUILD_REVISION}
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -56,9 +64,9 @@ RUN python /app/docker/smoke_test.py \
     && sed -i 's/\r$//' /app/docker/*.sh \
     && chmod +x /app/docker/entrypoint.sh \
     && useradd --create-home --uid 10001 cloud \
-    && mkdir -p /data/cloud /tmp/.X11-unix \
+    && mkdir -p /data/cloud /run/ok-ww-update /tmp/.X11-unix \
     && chmod 1777 /tmp/.X11-unix \
-    && chown -R cloud:cloud /data /app
+    && chown -R cloud:cloud /data /app /run/ok-ww-update
 
 USER cloud
 

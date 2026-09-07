@@ -10,6 +10,7 @@ from extensions.cloud.web_service import (
     _cloud_update_status,
     _disable_cloud_update_checks,
     _inject_default_web_language,
+    _running_version,
     _web_translation_catalog,
     build_cloud_web_config,
 )
@@ -121,6 +122,18 @@ def test_cloud_runtime_reports_updates_as_unsupported():
     }
 
 
+def test_running_version_prefers_container_build_metadata(monkeypatch):
+    monkeypatch.setenv("OK_WW_BUILD_VERSION", "v9.8.7")
+
+    assert _running_version({"version": "dev"}) == "v9.8.7"
+
+
+def test_running_version_uses_packaged_release_when_build_metadata_is_dev(monkeypatch):
+    monkeypatch.setenv("OK_WW_BUILD_VERSION", "dev")
+
+    assert _running_version({"version": "dev"}) == "v1.0.7"
+
+
 def test_cloud_game_button_does_not_cover_header_actions():
     result = _inject_default_web_language(
         '<html><script type="module" src="/static/app.js"></script></html>',
@@ -129,6 +142,21 @@ def test_cloud_game_button_does_not_cover_header_actions():
 
     assert "right:20px;bottom:20px" in result
     assert "right:20px;top:14px" not in result
+
+
+def test_docker_update_control_is_next_to_cloud_button_with_overlay_version():
+    result = _inject_default_web_language(
+        '<html><script type="module" src="/static/app.js"></script></html>',
+        "zh_CN",
+    )
+
+    assert "okww-cloud-controls" in result
+    assert "okww-docker-update" in result
+    assert "更新 Git / Docker" in result
+    assert "okww-docker-version" in result
+    assert "position:absolute;right:0;top:calc(100% + 3px);opacity:.55" in result
+    assert "headers:{'X-OK-WW-Update':'1'}" in result
+    assert "busy||state.task_running||state.game_running" in result
 
 
 def test_default_web_language_bootstrap_preserves_saved_choice():
@@ -192,6 +220,93 @@ def test_first_manual_start_allows_enrollment_then_closes_only_game_on_done():
     assert starts == ["DailyTask"]
     assert session.stops == 1
     assert closes == []
+
+
+def test_failed_task_state_releases_cloud_game_and_allows_next_task():
+    task = SimpleNamespace(running=False)
+    runtime, _runtime_starts, starts, _actions, _stops, _closes = make_runtime(task)
+    session = FakeSession()
+    task_state = FakeSignal()
+    controller = CloudWebController(
+        runtime,
+        session,
+        FakeProfile(True),
+        task_state_signal=task_state,
+    )
+    controller.install()
+
+    runtime.start_task("DailyTask")
+    task.running = True
+    task_state.callback(task)
+    task.running = False
+    task_state.callback(None)
+
+    assert controller.manual_game_status()["task_running"] is False
+    assert session.stops == 1
+    runtime.start_task("DailyTask")
+    assert starts == ["DailyTask", "DailyTask"]
+
+
+def test_queued_task_ignores_unrelated_idle_state_before_starting():
+    task = SimpleNamespace(running=False)
+    runtime, *_ = make_runtime(task)
+    session = FakeSession()
+    task_state = FakeSignal()
+    controller = CloudWebController(
+        runtime,
+        session,
+        FakeProfile(True),
+        task_state_signal=task_state,
+    )
+    controller.install()
+
+    runtime.start_task("DailyTask")
+    task_state.callback(None)
+
+    assert controller.manual_game_status()["task_running"] is True
+    assert session.stops == 0
+
+
+def test_success_signal_and_followup_idle_state_close_game_only_once():
+    task = SimpleNamespace(running=True)
+    runtime, *_ = make_runtime(task)
+    session = FakeSession()
+    task_done = FakeSignal()
+    task_state = FakeSignal()
+    controller = CloudWebController(
+        runtime,
+        session,
+        FakeProfile(True),
+        task_done_signal=task_done,
+        task_state_signal=task_state,
+    )
+    controller.install()
+
+    runtime.start_task("DailyTask")
+    task_state.callback(task)
+    task_done.callback(task)
+    task.running = False
+    task_state.callback(task)
+
+    assert session.stops == 1
+
+
+def test_controller_close_disconnects_both_task_signals():
+    runtime, *_ = make_runtime(object())
+    task_done = FakeSignal()
+    task_state = FakeSignal()
+    controller = CloudWebController(
+        runtime,
+        FakeSession(),
+        FakeProfile(True),
+        task_done_signal=task_done,
+        task_state_signal=task_state,
+    )
+
+    controller.close()
+
+    assert task_done.callback is None
+    assert task_state.callback is None
 
 
 def test_saved_login_failure_sends_notification_and_closes_game_page():

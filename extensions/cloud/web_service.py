@@ -23,6 +23,7 @@ from .ok_bridge import CloudDeviceManager, create_cloud_ok_class
 from .profile import ProfileStore
 from .session import CloudSession
 from .task_runner import build_cloud_task_config
+from .update_control import DockerUpdateControl
 
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,8 @@ ZH_CN_WEB_OVERRIDES = {
     "Start Cloud Game": "启动云游戏",
     "Starting Cloud Game...": "正在启动云游戏…",
     "Stop Cloud Game": "关闭云游戏",
+    "Update Docker": "更新 Git / Docker",
+    "Updating Docker...": "正在更新 Docker…",
     "Game Hotkey": "游戏快捷键",
     "Monthly": "每月",
     "Once": "单次",
@@ -147,14 +150,45 @@ def _inject_default_web_language(index_html: str, language: str) -> str:
         "try{const response=await fetch('/api/cloud-game/'+action,{method:'POST'});"
         "if(!response.ok)throw new Error(await response.text());}finally{await okwwRefreshCloudGame();}"
         "}"
+        "async function okwwRefreshDockerUpdate(){"
+        "const button=document.getElementById('okww-docker-update');"
+        "const version=document.getElementById('okww-docker-version');"
+        "if(!button||!version)return;"
+        "try{const response=await fetch('/api/docker-update');const state=await response.json();"
+        "const busy=['queued','checking','deferred','updating','rebuilding'].includes(state.status);"
+        "button.disabled=!state.enabled||busy||state.task_running||state.game_running;"
+        "button.textContent=busy?'Updating Docker...':'Update Docker';"
+        "button.title=state.message||state.status||'';"
+        "version.textContent=state.current_version||'dev';okwwTranslateRoot(button);"
+        "}catch(error){button.disabled=true;button.title=String(error);}}"
+        "async function okwwRequestDockerUpdate(){"
+        "const button=document.getElementById('okww-docker-update');button.disabled=true;"
+        "try{const response=await fetch('/api/docker-update',{method:'POST',"
+        "headers:{'X-OK-WW-Update':'1'}});"
+        "if(!response.ok)throw new Error(await response.text());}"
+        "catch(error){button.title=String(error);}finally{await okwwRefreshDockerUpdate();}"
+        "}"
         "document.addEventListener('DOMContentLoaded',()=>{"
+        "const controls=document.createElement('div');controls.id='okww-cloud-controls';"
+        "controls.style.cssText='position:fixed;right:20px;bottom:20px;z-index:2147483647;"
+        "display:flex;gap:8px;align-items:center';"
         "const button=document.createElement('button');button.id='okww-cloud-game-control';"
         "button.type='button';button.textContent='Start Cloud Game';"
-        "button.style.cssText='position:fixed;right:20px;bottom:20px;z-index:2147483647;"
-        "padding:8px 14px;border:0;border-radius:8px;background:#2563eb;color:white;"
+        "button.style.cssText='padding:8px 14px;border:0;border-radius:8px;background:#2563eb;color:white;"
         "font:600 14px sans-serif;cursor:pointer;box-shadow:0 2px 8px #0004';"
-        "button.addEventListener('click',okwwToggleCloudGame);document.body.appendChild(button);"
-        "okwwRefreshCloudGame();setInterval(okwwRefreshCloudGame,2000);"
+        "button.addEventListener('click',okwwToggleCloudGame);controls.appendChild(button);"
+        "const update=document.createElement('button');update.id='okww-docker-update';"
+        "update.type='button';update.textContent='Update Docker';"
+        "update.style.cssText='position:relative;padding:8px 14px;border:0;border-radius:8px;"
+        "background:#374151;color:white;font:600 14px sans-serif;cursor:pointer;"
+        "box-shadow:0 2px 8px #0004';"
+        "update.addEventListener('click',okwwRequestDockerUpdate);controls.appendChild(update);"
+        "const version=document.createElement('span');version.id='okww-docker-version';"
+        "version.style.cssText='position:absolute;right:0;top:calc(100% + 3px);opacity:.55;"
+        "font:11px/1.2 monospace;color:currentColor;pointer-events:none;white-space:nowrap';"
+        "version.textContent='dev';controls.appendChild(version);document.body.appendChild(controls);"
+        "okwwRefreshCloudGame();okwwRefreshDockerUpdate();"
+        "setInterval(okwwRefreshCloudGame,2000);setInterval(okwwRefreshDockerUpdate,2000);"
         "});"
         "</script>"
     )
@@ -174,6 +208,8 @@ class CloudWebController:
         *,
         failure_notifier: Callable[[Exception], None] | None = None,
         task_done_signal: Any = None,
+        task_state_signal: Any = None,
+        update_control: DockerUpdateControl | None = None,
     ) -> None:
         self.runtime = runtime
         self.session = session
@@ -181,6 +217,7 @@ class CloudWebController:
         self.failure_notifier = failure_notifier
         self._lock = threading.RLock()
         self._active_task: Any = None
+        self._active_task_started = False
         self._manual_game_thread: threading.Thread | None = None
         self._manual_game_error: str | None = None
         self._manual_game_stop_requested = False
@@ -191,8 +228,12 @@ class CloudWebController:
         self._original_stop_task = runtime.stop_task
         self._original_close = runtime.close
         self._task_done_signal = task_done_signal
+        self._task_state_signal = task_state_signal
+        self._update_control = update_control
         if task_done_signal is not None:
             task_done_signal.connect(self._on_task_done)
+        if task_state_signal is not None:
+            task_state_signal.connect(self._on_task_state_changed)
 
     def install(self) -> None:
         self.runtime.start = self.start
@@ -209,10 +250,15 @@ class CloudWebController:
 
     def start_task(self, task_identifier: str, *, allow_manual_login: bool | None = None):
         with self._lock:
+            if self._update_control is not None and self._update_control.update_in_progress():
+                raise RuntimeError("A Docker update is in progress")
             if self._active_task is not None:
                 raise RuntimeError("Another task is already running")
             task, _is_trigger = self.runtime.ok.get_task(task_identifier)
             self._active_task = task
+            self._active_task_started = False
+            if self._update_control is not None:
+                self._update_control.set_runtime_busy(True)
             if allow_manual_login is None:
                 allow_manual_login = not self.profile.is_enrolled(
                     self.session.settings.cloud_url
@@ -223,10 +269,16 @@ class CloudWebController:
             except AuthenticationRequiredError as exc:
                 self._notify_login_failure(exc)
                 self._active_task = None
+                self._active_task_started = False
+                if self._update_control is not None:
+                    self._update_control.set_runtime_busy(False)
                 self.session.stop()
                 raise
             except BaseException:
                 self._active_task = None
+                self._active_task_started = False
+                if self._update_control is not None:
+                    self._update_control.set_runtime_busy(False)
                 self.session.stop()
                 raise
 
@@ -252,12 +304,16 @@ class CloudWebController:
 
     def start_game_manually(self) -> dict[str, object]:
         with self._lock:
+            if self._update_control is not None and self._update_control.update_in_progress():
+                raise RuntimeError("A Docker update is in progress")
             if self._active_task is not None:
                 raise RuntimeError("An automation task is already running")
             if self._manual_game_thread is not None and self._manual_game_thread.is_alive():
                 return self.manual_game_status()
             self._manual_game_error = None
             self._manual_game_stop_requested = False
+            if self._update_control is not None:
+                self._update_control.set_runtime_busy(True)
             self._manual_game_thread = threading.Thread(
                 target=self._run_manual_game_start,
                 name="cloud-game-manual-start",
@@ -274,6 +330,8 @@ class CloudWebController:
                 if not self._manual_game_stop_requested:
                     logger.exception("manual cloud-game start failed")
                     self._manual_game_error = str(exc)
+            if self._update_control is not None:
+                self._update_control.set_runtime_busy(False)
 
     def stop_game_manually(self) -> dict[str, object]:
         with self._lock:
@@ -284,6 +342,8 @@ class CloudWebController:
             self.stop_task()
         else:
             self.session.stop()
+            if self._update_control is not None:
+                self._update_control.set_runtime_busy(False)
 
         with self._lock:
             self._manual_game_error = None
@@ -309,10 +369,14 @@ class CloudWebController:
                 if task is not self._active_task:
                     return
             self._active_task = None
+            self._active_task_started = False
         try:
             self.session.stop()
         except Exception:
             logger.exception("failed to close the cloud-game tab")
+        finally:
+            if self._update_control is not None:
+                self._update_control.set_runtime_busy(False)
 
     def _notify_login_failure(self, error: AuthenticationRequiredError) -> None:
         if self.failure_notifier is None:
@@ -328,10 +392,29 @@ class CloudWebController:
                 return
         self._close_active_game()
 
+    def _on_task_state_changed(self, task: Any) -> None:
+        with self._lock:
+            active_task = self._active_task
+            if active_task is None:
+                return
+            if task is active_task and bool(getattr(active_task, "running", False)):
+                self._active_task_started = True
+                return
+            should_close = self._active_task_started and not bool(
+                getattr(active_task, "running", False)
+            )
+        if should_close:
+            self._close_active_game()
+
     def close(self) -> None:
         if self._task_done_signal is not None:
             try:
                 self._task_done_signal.disconnect(self._on_task_done)
+            except Exception:
+                pass
+        if self._task_state_signal is not None:
+            try:
+                self._task_state_signal.disconnect(self._on_task_state_changed)
             except Exception:
                 pass
         try:
@@ -339,6 +422,8 @@ class CloudWebController:
                 self.schedule_manager.stop()
             self.session.stop()
         finally:
+            if self._update_control is not None:
+                self._update_control.set_runtime_busy(False)
             self._original_close()
 
 
@@ -370,6 +455,18 @@ def _cloud_update_status(config: dict[str, Any]) -> dict[str, object]:
     }
 
 
+def _running_version(config: dict[str, Any]) -> str:
+    configured = os.environ.get("OK_WW_BUILD_VERSION", "").strip()
+    if configured and configured != "dev":
+        return configured
+    version_file = Path(__file__).resolve().parents[2] / "VERSION"
+    try:
+        packaged = version_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        packaged = ""
+    return packaged or configured or str(config.get("version") or "dev")
+
+
 def _disable_cloud_update_checks(runtime: Any, config: dict[str, Any]) -> None:
     original_about = runtime.about
 
@@ -391,6 +488,7 @@ def create_cloud_web_app(
 
     try:
         from config import config as project_config
+        from fastapi import Header, HTTPException
         from ok.core.events import communicate
         from ok.ui.web import app as ok_web_app_module
         from ok.ui.web.app import create_web_app
@@ -420,6 +518,11 @@ def create_cloud_web_app(
 
     runtime = app.state.runtime
     _disable_cloud_update_checks(runtime, ok_instance.config)
+    update_control = DockerUpdateControl(
+        settings.data_dir,
+        fallback_version=_running_version(ok_instance.config),
+    )
+    update_control.set_runtime_busy(False)
 
     smtp_settings = SmtpSettings.from_env()
     controller = CloudWebController(
@@ -430,6 +533,8 @@ def create_cloud_web_app(
             SmtpFailureNotifier(smtp_settings) if smtp_settings is not None else None
         ),
         task_done_signal=communicate.task_done,
+        task_state_signal=communicate.task,
+        update_control=update_control,
     )
     controller.install()
     app.state.cloud_controller = controller
@@ -460,6 +565,31 @@ def create_cloud_web_app(
     @app.post("/api/cloud-game/stop", include_in_schema=False)
     async def stop_cloud_game():
         return controller.stop_game_manually()
+
+    @app.get("/api/docker-update", include_in_schema=False)
+    async def docker_update_status():
+        game_status = controller.manual_game_status()
+        return {
+            **update_control.status(),
+            "task_running": game_status["task_running"],
+            "game_running": game_status["running"],
+        }
+
+    @app.post("/api/docker-update", include_in_schema=False, status_code=202)
+    async def request_docker_update(
+        x_ok_ww_update: str | None = Header(default=None),
+    ):
+        if x_ok_ww_update != "1":
+            raise HTTPException(status_code=403, detail="Missing update confirmation")
+        game_status = controller.manual_game_status()
+        if game_status["task_running"]:
+            raise HTTPException(status_code=409, detail="An automation task is running")
+        if game_status["running"]:
+            raise HTTPException(status_code=409, detail="The cloud game is running")
+        try:
+            return update_control.request_update()
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return app
 

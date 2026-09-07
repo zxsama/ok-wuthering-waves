@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      args:
+        OK_WW_BUILD_VERSION: ${CLOUD_BUILD_VERSION:-dev}
+        OK_WW_BUILD_REVISION: ${CLOUD_BUILD_REVISION:-unknown}
     image: ${CLOUD_IMAGE:-ok-wuthering-waves-cloud:dev}
     platform: linux/amd64
     restart: "${CLOUD_RESTART_POLICY:-no}"
@@ -23,6 +26,7 @@ services:
       OK_WW_CLOUD_QUEUE_TIMEOUT: ${OK_WW_CLOUD_QUEUE_TIMEOUT:-7200}
       OK_WW_CLOUD_TASK_RUNNER: ${OK_WW_CLOUD_TASK_RUNNER:-extensions.cloud.task_runner:create_daily_task_runner}
       OK_WW_WEB_DEFAULT_LANGUAGE: ${OK_WW_WEB_DEFAULT_LANGUAGE:-zh_CN}
+      OK_WW_UPDATE_CONTROL_DIR: /run/ok-ww-update
       OK_WW_SMTP_ENABLED: ${OK_WW_SMTP_ENABLED:-false}
       OK_WW_SMTP_HOST: ${OK_WW_SMTP_HOST:-}
       OK_WW_SMTP_PORT: ${OK_WW_SMTP_PORT:-587}
@@ -69,6 +73,7 @@ services:
         max-file: "${CLOUD_LOG_MAX_FILES:-5}"
     volumes:
       - cloud-data:/data/cloud
+      - update-control:/run/ok-ww-update
 
   auto-updater:
     build:
@@ -80,12 +85,18 @@ services:
       CLOUD_UPDATE_BRANCH: ${CLOUD_UPDATE_BRANCH:-master}
       CLOUD_UPDATE_COMPOSE_FILE: /workspace/compose.yaml
       CLOUD_UPDATE_INTERVAL_SECONDS: ${CLOUD_UPDATE_INTERVAL_SECONDS:-86400}
+      CLOUD_UPDATE_POLL_SECONDS: ${CLOUD_UPDATE_POLL_SECONDS:-1}
+      CLOUD_UPDATE_HEALTH_TIMEOUT_SECONDS: ${CLOUD_UPDATE_HEALTH_TIMEOUT_SECONDS:-240}
+      CLOUD_UPDATE_RETRY_SECONDS: ${CLOUD_UPDATE_RETRY_SECONDS:-300}
       CLOUD_UPDATE_PROJECT_NAME: ${CLOUD_UPDATE_PROJECT_NAME:-}
       CLOUD_UPDATE_REMOTE: ${CLOUD_UPDATE_REMOTE:-origin}
       CLOUD_UPDATE_REPOSITORY_DIR: /workspace
+      CLOUD_UPDATE_CONTROL_DIR: /run/ok-ww-update
     volumes:
       - .:/workspace
+      - update-control:/run/ok-ww-update
       - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   cloud-data:
+  update-control:

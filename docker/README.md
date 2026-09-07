@@ -42,10 +42,18 @@ can be fast-forwarded, it pulls the repository, rebuilds `cloud-runner`, and
 recreates that service. Tracked local changes or a diverged branch cause the
 update to be skipped rather than overwritten.
 
+The management page also shows an `Update Docker` button beside the cloud-game
+button. It requests an immediate update through the shared `update-control`
+volume; only `auto-updater` receives the repository mount and Docker socket.
+The small label below the button is the version baked into the currently
+running image. Manual update requests rebuild even when Git is already current,
+which also allows retrying a previously failed image build.
+
 The updater mounts `/var/run/docker.sock`, which grants it control over the
 host Docker daemon. Enable it only for a repository and image you trust. Change
 the interval, remote, or branch with `CLOUD_UPDATE_INTERVAL_SECONDS`,
-`CLOUD_UPDATE_REMOTE`, and `CLOUD_UPDATE_BRANCH`. The updater normally reads
+`CLOUD_UPDATE_POLL_SECONDS`, `CLOUD_UPDATE_REMOTE`, and `CLOUD_UPDATE_BRANCH`.
+The updater normally reads
 the current Compose project name from its container label; set
 `CLOUD_UPDATE_PROJECT_NAME` only when the platform removes that label.
 

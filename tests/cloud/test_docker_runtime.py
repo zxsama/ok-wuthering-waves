@@ -122,6 +122,8 @@ def test_compose_smoke_checks_container_updates_and_vnc_transport():
     assert '"update_supported":false' in smoke
     assert "http://127.0.0.1:17880/api/updates" in smoke
     assert '"update_available":false' in smoke
+    assert "http://127.0.0.1:17880/api/docker-update" in smoke
+    assert '"current_version":"v1.0.7"' in smoke
     assert "ws://127.0.0.1:15980/websockify" in smoke
     assert "RFB 003.008" in smoke
     assert "SetProcessDpiAwareness error" in smoke
@@ -140,6 +142,7 @@ def test_runtime_healthcheck_covers_display_vnc_and_management_api():
 def test_compose_auto_updater_uses_fast_forward_and_docker_socket():
     compose = _read("compose.yaml")
     updater = _read("docker/auto_update.sh")
+    cloud_runner = compose.split("  auto-updater:", 1)[0]
 
     assert "docker/Dockerfile.updater" in compose
     assert "/var/run/docker.sock:/var/run/docker.sock" in compose
@@ -147,8 +150,41 @@ def test_compose_auto_updater_uses_fast_forward_and_docker_socket():
     assert "git -C \"$repository_dir\" merge --ff-only FETCH_HEAD" in updater
     assert "status --porcelain --untracked-files=no" in updater
     assert "--project-name \"$project_name\"" in updater
-    assert "-f \"$compose_file\" build cloud-runner" in updater
-    assert "--force-recreate cloud-runner" in updater
+    assert '-f "$repository_dir/docker/Dockerfile"' in updater
+    assert '"$image_name" "$repository_dir"' in updater
+    assert "--force-recreate --wait" in updater
+    assert "CLOUD_UPDATE_POLL_SECONDS" in compose
+    assert "update-control:/run/ok-ww-update" in compose
+    assert 'if [ -f "$control_dir/request" ]' in updater
+    assert 'force_rebuild="1"' in updater
+    assert 'write_control needs-rebuild "1"' in updater
+    assert 'ps -q cloud-runner' in updater
+    assert "'{{.State.Running}}'" in updater
+    assert 'rm -f "$marker"' in updater
+    assert 'write_status failed "Docker image build failed"' in updater
+    assert 'schedule_rebuild_retry' in updater
+    assert 'rebuild_retry_due' in updater
+    assert 'CLOUD_UPDATE_RETRY_SECONDS' in updater
+    assert 'kill "$heartbeat_pid"' in updater
+    assert 'rm -f "$control_dir/request.in-progress"' in updater
+    assert 'CLOUD_BUILD_VERSION="$build_version"' in updater
+    assert "/var/run/docker.sock" not in cloud_runner
+    assert ".:/workspace" not in cloud_runner
+    assert "CLOUD_UPDATE_CONTROL_DIR: /run/ok-ww-update" in compose
+    assert "chown 10001:10001 /run/ok-ww-update" in _read(
+        "docker/Dockerfile.updater"
+    )
+
+
+def test_cloud_image_exposes_build_version_without_git_metadata():
+    dockerfile = _read("docker/Dockerfile")
+    compose = _read("compose.yaml")
+
+    assert "ARG OK_WW_BUILD_VERSION=dev" in dockerfile
+    assert "ARG OK_WW_BUILD_REVISION=unknown" in dockerfile
+    assert "org.opencontainers.image.version=${OK_WW_BUILD_VERSION}" in dockerfile
+    assert "OK_WW_BUILD_VERSION: ${CLOUD_BUILD_VERSION:-dev}" in compose
+    assert "OK_WW_BUILD_REVISION: ${CLOUD_BUILD_REVISION:-unknown}" in compose
 
 
 def test_cloud_image_installs_pinned_web_server_dependencies():
