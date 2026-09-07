@@ -36,6 +36,7 @@ class CloudScheduleTaskInfo(ScheduleTaskInfo):
     start_minute: int = 0
     timeout_hours: int = 0
     auto_exit: bool = True
+    email_report: bool = True
 
 
 class CloudScheduleCache:
@@ -119,6 +120,7 @@ class CloudScheduleManager:
         start_hour: int = 9,
         start_minute: int = 0,
         auto_exit: bool = True,
+        email_report: bool = True,
         enabled: bool = True,
         description: str = "",
         interval_days: int = 0,
@@ -152,6 +154,7 @@ class CloudScheduleManager:
                 interval_hours=hours,
                 timeout_hours=max(0, int(timeout_hours)),
                 auto_exit=bool(auto_exit),
+                email_report=bool(email_report),
                 start_date=start_day.isoformat(),
                 task_index=int(task_index),
             )
@@ -169,6 +172,7 @@ class CloudScheduleManager:
         start_hour: int = 9,
         start_minute: int = 0,
         auto_exit: bool = True,
+        email_report: bool | None = None,
         enabled: bool = True,
         description: str = "",
         interval_days: int = 0,
@@ -198,6 +202,9 @@ class CloudScheduleManager:
                 interval_hours=hours,
                 timeout_hours=max(0, int(timeout_hours)),
                 auto_exit=bool(auto_exit),
+                email_report=(
+                    current.email_report if email_report is None else bool(email_report)
+                ),
                 start_date=start_day.isoformat(),
                 task_index=int(task_index),
             )
@@ -309,6 +316,7 @@ class CloudScheduleManager:
             start_minute=minute,
             timeout_hours=schedule.timeout_hours,
             auto_exit=schedule.auto_exit,
+            email_report=schedule.email_report,
         )
 
     def _next_run_time(self, schedule: CloudSchedule) -> str:

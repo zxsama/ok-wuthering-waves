@@ -1,3 +1,4 @@
+import inspect
 import unittest
 from types import SimpleNamespace
 
@@ -39,6 +40,11 @@ class TestTacet(TaskTestCase):
 
         self.assertFalse(result)
         self.assertEqual(calls, [{"raise_if_not_found": False, "time_out": 30}])
+
+    def test_walk_to_box_default_timeout_is_120_seconds(self):
+        parameter = inspect.signature(BaseWWTask.walk_to_box).parameters["time_out"]
+
+        self.assertEqual(parameter.default, 120)
 
     def test_walk_to_treasure_uses_fallback_text_after_first_search_fails(self):
         claim_text = object()

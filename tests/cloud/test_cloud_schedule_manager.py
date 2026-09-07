@@ -47,6 +47,7 @@ def test_web_crud_enable_disable_and_replace(tmp_path):
         start_hour=7,
         start_minute=35,
         auto_exit=False,
+        email_report=False,
         task_identifier="src.task.ForgeryTask.ForgeryTask",
     )
     created = manager.cache.get("Forgery Challenge")
@@ -55,6 +56,7 @@ def test_web_crud_enable_disable_and_replace(tmp_path):
     assert (created.start_hour, created.start_minute) == (7, 35)
     assert created.timeout_hours == 2
     assert created.auto_exit is False
+    assert created.email_report is False
 
     assert manager.disable_task(created.path)
     assert manager.cache.get(created.path).enabled is False
@@ -69,6 +71,7 @@ def test_web_crud_enable_disable_and_replace(tmp_path):
         start_hour=8,
         start_minute=10,
         auto_exit=True,
+        email_report=True,
         interval_days=2,
         interval_hours=0,
         task_identifier="src.task.ForgeryTask.ForgeryTask",
@@ -77,6 +80,7 @@ def test_web_crud_enable_disable_and_replace(tmp_path):
     assert replaced.trigger_type == "Custom"
     assert replaced.interval_days == 2
     assert replaced.interval_hours == 0
+    assert replaced.email_report is True
     assert replaced.timeout_hours == 4
 
     assert manager.delete_task(created.path)

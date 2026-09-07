@@ -1310,3 +1310,6 @@ msgstr "¿Eliminar permanentemente el equipo {team}?"
 
 msgid "Team deleted."
 msgstr "Equipo eliminado."
+
+msgid "Send Email Report After Task"
+msgstr "Enviar informe por correo al finalizar la tarea"

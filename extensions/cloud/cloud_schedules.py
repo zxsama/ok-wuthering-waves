@@ -59,6 +59,7 @@ class CloudSchedule:
     interval_hours: int = 0
     timeout_hours: int = 0
     auto_exit: bool = True
+    email_report: bool = True
     start_date: str = ""
     task_index: int = -1
 
@@ -96,6 +97,8 @@ class CloudSchedule:
                 )
         if not isinstance(self.auto_exit, bool):
             raise CloudConfigurationError("auto_exit must be a boolean")
+        if not isinstance(self.email_report, bool):
+            raise CloudConfigurationError("email_report must be a boolean")
         if self.start_date:
             try:
                 date.fromisoformat(self.start_date)
@@ -125,6 +128,8 @@ class ScheduledTaskRequest:
     claim_key: str = ""
     timeout_hours: int = 0
     auto_exit: bool = True
+    email_report: bool = True
+    schedule_name: str = ""
 
 
 def default_daily_schedule() -> CloudSchedule:
@@ -178,6 +183,7 @@ class CloudScheduleStore:
         interval_hours: int = 0,
         timeout_hours: int = 0,
         auto_exit: bool = True,
+        email_report: bool = True,
         start_date: str = "",
         task_index: int = -1,
     ) -> CloudSchedule:
@@ -194,6 +200,7 @@ class CloudScheduleStore:
             interval_hours=interval_hours,
             timeout_hours=timeout_hours,
             auto_exit=auto_exit,
+            email_report=email_report,
             start_date=start_date,
             task_index=task_index,
         )
@@ -220,6 +227,7 @@ class CloudScheduleStore:
         interval_hours: int | object = _UNSET,
         timeout_hours: int | object = _UNSET,
         auto_exit: bool | object = _UNSET,
+        email_report: bool | object = _UNSET,
         start_date: str | object = _UNSET,
         task_index: int | object = _UNSET,
     ) -> CloudSchedule:
@@ -241,6 +249,7 @@ class CloudScheduleStore:
                     "interval_hours": interval_hours,
                     "timeout_hours": timeout_hours,
                     "auto_exit": auto_exit,
+                    "email_report": email_report,
                     "start_date": start_date,
                     "task_index": task_index,
                 }.items()
@@ -318,6 +327,8 @@ class CloudScheduleStore:
                         claim_key=claim_key,
                         timeout_hours=schedule.timeout_hours,
                         auto_exit=schedule.auto_exit,
+                        email_report=schedule.email_report,
+                        schedule_name=schedule.name or schedule.task_id.rsplit(".", 1)[-1],
                     )
                 )
             if requests:
@@ -392,6 +403,7 @@ class CloudScheduleStore:
             "interval_hours": 0,
             "timeout_hours": 0,
             "auto_exit": True,
+            "email_report": True,
             "start_date": "",
             "task_index": -1,
         }

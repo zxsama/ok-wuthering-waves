@@ -60,6 +60,30 @@ def test_smtp_notifier_uses_tls_authentication_and_sends_message():
     assert "本邮件不包含登录凭据" in message.get_content()
 
 
+def test_smtp_notifier_sends_scheduled_task_report():
+    settings = SmtpSettings(
+        host="smtp.example.test",
+        port=587,
+        username="runner",
+        password="secret-value",
+        sender="runner@example.test",
+        recipient="owner@example.test",
+    )
+
+    with patch("extensions.cloud.notifier.smtplib.SMTP") as smtp:
+        client = smtp.return_value.__enter__.return_value
+        SmtpFailureNotifier(settings).send_task_report(
+            schedule_name="每日任务",
+            task_name="Daily Task",
+            succeeded=True,
+        )
+
+    message = client.send_message.call_args.args[0]
+    assert message["Subject"] == "【OK-WW】定时任务成功：每日任务"
+    assert "执行任务：Daily Task" in message.get_content()
+    assert "执行结果：成功" in message.get_content()
+
+
 def test_smtp_notifier_can_send_without_tls_or_authentication():
     settings = SmtpSettings(
         host="smtp.example.test",

@@ -206,7 +206,7 @@ class BaseWWTask(BaseTask):
             self.sleep(0.01)
         return None
 
-    def walk_to_box(self, find_function, time_out=30, end_condition=None, y_offset=0.05, x_threshold=0.07,
+    def walk_to_box(self, find_function, time_out=120, end_condition=None, y_offset=0.05, x_threshold=0.07,
                     use_hook=False):
         start = time.time()
         while time.time() - start < time_out:

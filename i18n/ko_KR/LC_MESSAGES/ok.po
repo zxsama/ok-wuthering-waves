@@ -1384,3 +1384,6 @@ msgstr "{team} 팀을 영구적으로 삭제하시겠습니까?"
 
 msgid "Team deleted."
 msgstr "팀을 삭제했습니다."
+
+msgid "Send Email Report After Task"
+msgstr "작업 완료 후 이메일 보고서 보내기"

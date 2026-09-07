@@ -63,6 +63,7 @@ def test_crud_and_enable_disable_any_task(tmp_path):
     )
 
     assert store.get(created.id) == created
+    assert created.email_report is True
     assert created in store.list()
     disabled = store.set_enabled(created.id, False)
     assert disabled.enabled is False

@@ -7,12 +7,14 @@ are replaced here.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from types import MethodType
 from typing import Any
 
 from .cloud_schedules import ScheduledTaskRequest
@@ -33,6 +35,146 @@ CHARACTER_CODE_WEB_TAB = [
 ]
 WEB_DEFAULT_LANGUAGE_ENV = "OK_WW_WEB_DEFAULT_LANGUAGE"
 WEB_LANGUAGES = {"Auto", "en_US", "es_ES", "ja_JP", "ko_KR", "zh_CN", "zh_TW"}
+
+
+def _install_schedule_email_support(runtime: Any) -> None:
+    from ok.util.windows_schedule import normalize_trigger_type, resolve_schedule_task_index
+
+    def create_schedule_task(self, body: dict[str, Any]):
+        task_index = int(body.get("task_index", 0))
+        tasks = list(self.executor.onetime_tasks or [])
+        available_indices = {
+            index + 1
+            for index, task in enumerate(tasks)
+            if getattr(task, "support_schedule_task", False)
+            and getattr(task, "visible", True)
+        }
+        if task_index not in available_indices:
+            raise ValueError("Invalid scheduled task")
+        task = tasks[task_index - 1]
+        success = self.schedule_manager.create_task(
+            task_name=str(body.get("name") or ""),
+            task_index=task_index,
+            trigger_type=normalize_trigger_type(body.get("trigger_type", "Daily")),
+            timeout_hours=int(body.get("timeout_hours", 0)),
+            start_hour=int(body.get("start_hour", 9)),
+            start_minute=int(body.get("start_minute", 0)),
+            auto_exit=bool(body.get("auto_exit", True)),
+            email_report=bool(body.get("email_report", True)),
+            enabled=True,
+            interval_days=int(body.get("interval_days", 0)),
+            interval_hours=int(body.get("interval_hours", 0)),
+            task_identifier=f"{task.__class__.__module__}.{task.__class__.__name__}",
+        )
+        if not success:
+            raise RuntimeError("Failed to create scheduled task")
+        return self.schedule_tasks()
+
+    def update_schedule_task(self, name: str, body: dict[str, Any]):
+        current = self.schedule_manager.cache.get(name)
+        if current is None:
+            current = next(
+                (
+                    item
+                    for item in self.schedule_manager.cache.values()
+                    if item.path == name or item.name == name
+                ),
+                None,
+            )
+        if current is None or current.read_only:
+            raise ValueError("Scheduled task is not editable")
+        task_index = int(body.get("task_index", current.task_index))
+        if current.task_identifier:
+            task_index = resolve_schedule_task_index(
+                current.task_identifier, self.executor.onetime_tasks
+            )
+        available_indices = {
+            index + 1
+            for index, task in enumerate(self.executor.onetime_tasks or [])
+            if getattr(task, "support_schedule_task", False)
+            and getattr(task, "visible", True)
+        }
+        if task_index not in available_indices:
+            raise ValueError("Invalid scheduled task")
+        task_identifier = getattr(current, "task_identifier", "") or None
+        if not task_identifier:
+            try:
+                tasks = list(self.executor.onetime_tasks or [])
+                if 1 <= task_index <= len(tasks):
+                    task = tasks[task_index - 1]
+                    task_identifier = (
+                        f"{task.__class__.__module__}.{task.__class__.__name__}"
+                    )
+            except Exception:
+                logger.exception(
+                    "Failed to resolve task_identifier for modified scheduled task"
+                )
+        success = self.schedule_manager.replace_task(
+            task_name=current.name,
+            task_index=task_index,
+            trigger_type=normalize_trigger_type(
+                body.get("trigger_type", current.trigger_type or "Daily")
+            ),
+            timeout_hours=int(body.get("timeout_hours", 0)),
+            start_hour=int(body.get("start_hour", 9)),
+            start_minute=int(body.get("start_minute", 0)),
+            auto_exit=bool(body.get("auto_exit", True)),
+            email_report=bool(body.get("email_report", current.email_report)),
+            enabled=current.enabled,
+            description=current.description,
+            interval_days=int(body.get("interval_days", current.interval_days)),
+            interval_hours=int(body.get("interval_hours", current.interval_hours)),
+            task_identifier=task_identifier,
+        )
+        if not success:
+            raise RuntimeError("Failed to modify scheduled task")
+        return self.schedule_tasks()
+
+    runtime.create_schedule_task = MethodType(create_schedule_task, runtime)
+    runtime.update_schedule_task = MethodType(update_schedule_task, runtime)
+
+
+def _install_slash_safe_task_routes(app: Any, runtime: Any) -> None:
+    """Add task endpoints whose names may contain a slash."""
+
+    from fastapi import HTTPException
+
+    @app.post("/api/tasks/{name:path}/start", include_in_schema=False)
+    async def start_task_with_slash(name: str):
+        try:
+            return await asyncio.to_thread(runtime.start_task, name)
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/tasks/{name:path}/action", include_in_schema=False)
+    async def task_action_with_slash(name: str, body: dict[str, Any]):
+        try:
+            return await asyncio.to_thread(
+                runtime.task_action, name, str(body.get("action", ""))
+            )
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/tasks/{name:path}/config/reset", include_in_schema=False)
+    async def reset_task_config_with_slash(name: str):
+        try:
+            return await asyncio.to_thread(runtime.reset_task_config, name)
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/tasks/{name:path}/config", include_in_schema=False)
+    async def set_task_config_with_slash(name: str, body: dict[str, Any]):
+        try:
+            return await asyncio.to_thread(
+                runtime.set_task_config,
+                name,
+                str(body.get("key", "")),
+                body.get("value"),
+            )
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 ZH_CN_WEB_OVERRIDES = {
     "Auto Exit After Task": "任务完成后自动退出",
     "Character Config": "角色设置",
@@ -44,6 +186,7 @@ ZH_CN_WEB_OVERRIDES = {
     "Stop Cloud Game": "关闭云游戏",
     "Update Docker": "更新 Git / Docker",
     "Updating Docker...": "正在更新 Docker…",
+    "Send Email Report After Task": "任务完成后发送邮件汇报",
     "Game Hotkey": "游戏快捷键",
     "Monthly": "每月",
     "Once": "单次",
@@ -119,6 +262,35 @@ def _inject_default_web_language(index_html: str, language: str) -> str:
         "okwwPendingRoots.clear();"
         "});"
         "}"
+        "let okwwEditingSchedulePath='';"
+        "document.addEventListener('click',event=>{"
+        "const button=event.target.closest?.('button');"
+        "const row=button?.closest('.schedule-table tbody tr');if(!row)return;"
+        "const actions=[...row.querySelectorAll('td:last-child button')];"
+        "if(actions[0]!==button)return;"
+        "okwwEditingSchedulePath=row.querySelector('td')?.getAttribute('title')||'';"
+        "},{capture:true});"
+        "function okwwEnhanceScheduleForms(root){"
+        "for(const form of root.querySelectorAll?.('form.schedule-form')||[]){"
+        "if(form.querySelector('[data-okww-email-report]'))continue;"
+        "const checks=[...form.querySelectorAll('label.schedule-check')];"
+        "const autoExit=checks.find(label=>label.querySelector('input[type=checkbox]'));"
+        "if(!autoExit)continue;const label=document.createElement('label');"
+        "label.className='schedule-check';label.dataset.okwwEmailReport='1';"
+        "const input=document.createElement('input');input.type='checkbox';input.checked=true;"
+        "label.append(input,document.createTextNode('Send Email Report After Task'));"
+        "autoExit.after(label);okwwTranslateRoot(label);"
+        "const disabled=form.querySelector('input[disabled]');"
+        "if(disabled){const submit=form.querySelector('button[type=submit]');"
+        "input.disabled=true;if(submit)submit.disabled=true;"
+        "fetch('/api/schedule').then(response=>response.json()).then(data=>{"
+        "const item=data.tasks.find(task=>task.path===okwwEditingSchedulePath||"
+        "task.name===disabled.value||okwwTranslations[task.name]===disabled.value);"
+        "if(item)input.checked=item.email_report!==false;}).catch(()=>{}).finally(()=>{"
+        "input.disabled=false;if(submit)submit.disabled=false;});}"
+        "form.addEventListener('submit',()=>sessionStorage.setItem('okww-email-report',String(input.checked)),{capture:true});"
+        "}"
+        "}"
         "const okwwObserver=new MutationObserver(records=>{"
         "for(const record of records){"
         "if(record.type==='attributes'){okwwScheduleTranslation(document.body);continue;}"
@@ -126,14 +298,20 @@ def _inject_default_web_language(index_html: str, language: str) -> str:
         "if(addedNode.nodeType===Node.TEXT_NODE){"
         "okwwScheduleTranslation(addedNode.parentNode);"
         "}else if(addedNode.nodeType===Node.ELEMENT_NODE){"
-        "okwwScheduleTranslation(addedNode);"
+        "okwwScheduleTranslation(addedNode);okwwEnhanceScheduleForms(addedNode);"
         "}"
         "}"
         "}"
         "});"
         "okwwObserver.observe(document.documentElement,{subtree:true,childList:true,"
         "attributes:true,attributeFilter:['lang']});"
-        "document.addEventListener('DOMContentLoaded',()=>okwwScheduleTranslation(document.body));"
+        "document.addEventListener('DOMContentLoaded',()=>{okwwScheduleTranslation(document.body);okwwEnhanceScheduleForms(document);});"
+        "const okwwOriginalFetch=window.fetch.bind(window);window.fetch=async(input,init)=>{"
+        "const url=typeof input==='string'?input:input.url;"
+        "if(init?.method==='POST'&&url.startsWith('/api/schedule')&&init.body){"
+        "try{const body=JSON.parse(init.body);body.email_report=sessionStorage.getItem('okww-email-report')!=='false';"
+        "init={...init,body:JSON.stringify(body)};}catch{}}"
+        "return okwwOriginalFetch(input,init);};"
         "async function okwwRefreshCloudGame(){"
         "const button=document.getElementById('okww-cloud-game-control');if(!button)return;"
         "try{const response=await fetch('/api/cloud-game');const state=await response.json();"
@@ -221,6 +399,7 @@ class CloudWebController:
         self._manual_game_thread: threading.Thread | None = None
         self._manual_game_error: str | None = None
         self._manual_game_stop_requested = False
+        self._scheduled_request: ScheduledTaskRequest | None = None
         self.schedule_manager: Any = None
         self._original_start = runtime.start
         self._original_start_task = runtime.start_task
@@ -283,7 +462,15 @@ class CloudWebController:
                 raise
 
     def enqueue_scheduled(self, request: ScheduledTaskRequest) -> object:
-        return self.start_task(request.task_id, allow_manual_login=False)
+        with self._lock:
+            if self._active_task is not None:
+                raise RuntimeError("Another task is already running")
+            self._scheduled_request = request
+            try:
+                return self.start_task(request.task_id, allow_manual_login=False)
+            except BaseException:
+                self._scheduled_request = None
+                raise
 
     def manual_game_status(self) -> dict[str, object]:
         with self._lock:
@@ -360,16 +547,21 @@ class CloudWebController:
         self._close_active_game()
         return result
 
-    def _close_active_game(self, task_identifier: str | None = None) -> None:
+    def _close_active_game(
+        self, task_identifier: str | None = None, *, succeeded: bool = False
+    ) -> None:
         with self._lock:
             if self._active_task is None:
                 return
+            task = self._active_task
             if task_identifier is not None:
-                task, _is_trigger = self.runtime.ok.get_task(task_identifier)
-                if task is not self._active_task:
+                requested_task, _is_trigger = self.runtime.ok.get_task(task_identifier)
+                if requested_task is not task:
                     return
             self._active_task = None
             self._active_task_started = False
+            scheduled_request = self._scheduled_request
+            self._scheduled_request = None
         try:
             self.session.stop()
         except Exception:
@@ -377,6 +569,34 @@ class CloudWebController:
         finally:
             if self._update_control is not None:
                 self._update_control.set_runtime_busy(False)
+        if scheduled_request is not None and scheduled_request.email_report:
+            self._send_scheduled_report(task, scheduled_request, succeeded=succeeded)
+
+    def _send_scheduled_report(
+        self, task: Any, request: ScheduledTaskRequest, *, succeeded: bool
+    ) -> None:
+        notifier = self.failure_notifier
+        if notifier is None or not hasattr(notifier, "send_task_report"):
+            return
+        details = "" if succeeded else "任务异常结束或被停止"
+
+        def send() -> None:
+            try:
+                notifier.send_task_report(
+                    schedule_name=request.schedule_name or request.schedule_id,
+                    task_name=str(getattr(task, "name", request.task_id)),
+                    succeeded=succeeded,
+                    details=details,
+                )
+            except Exception:
+                logger.exception("failed to send scheduled task report")
+
+        try:
+            threading.Thread(
+                target=send, name="scheduled-task-email", daemon=True
+            ).start()
+        except Exception:
+            logger.exception("failed to start scheduled task report sender")
 
     def _notify_login_failure(self, error: AuthenticationRequiredError) -> None:
         if self.failure_notifier is None:
@@ -390,7 +610,7 @@ class CloudWebController:
         with self._lock:
             if task is not self._active_task:
                 return
-        self._close_active_game()
+        self._close_active_game(succeeded=True)
 
     def _on_task_state_changed(self, task: Any) -> None:
         with self._lock:
@@ -517,6 +737,8 @@ def create_cloud_web_app(
         return await call_next(request)
 
     runtime = app.state.runtime
+    _install_schedule_email_support(runtime)
+    _install_slash_safe_task_routes(app, runtime)
     _disable_cloud_update_checks(runtime, ok_instance.config)
     update_control = DockerUpdateControl(
         settings.data_dir,

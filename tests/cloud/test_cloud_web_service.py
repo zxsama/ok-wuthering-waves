@@ -1,8 +1,14 @@
+import asyncio
+import threading
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
+from fastapi import FastAPI
+from starlette.routing import Match
 
 from extensions.cloud.config import CloudSettings
+from extensions.cloud.cloud_schedules import ScheduledTaskRequest
 from extensions.cloud.models import AuthenticationRequiredError, CloudConfigurationError
 from extensions.cloud.web_service import (
     CHARACTER_CODE_WEB_TAB,
@@ -10,6 +16,8 @@ from extensions.cloud.web_service import (
     _cloud_update_status,
     _disable_cloud_update_checks,
     _inject_default_web_language,
+    _install_slash_safe_task_routes,
+    _install_schedule_email_support,
     _running_version,
     _web_translation_catalog,
     build_cloud_web_config,
@@ -159,6 +167,145 @@ def test_docker_update_control_is_next_to_cloud_button_with_overlay_version():
     assert "busy||state.task_running||state.game_running" in result
 
 
+def test_schedule_form_adds_default_enabled_email_report_option():
+    result = _inject_default_web_language(
+        '<html><script type="module" src="/static/app.js"></script></html>',
+        "zh_CN",
+    )
+
+    assert "Send Email Report After Task" in result
+    assert "任务完成后发送邮件汇报" in result
+    assert "body.email_report" in result
+    assert "input.checked=true" in result
+    assert "task.path===okwwEditingSchedulePath" in result
+    assert "okwwTranslations[task.name]===disabled.value" in result
+    assert "input.disabled=true" in result
+
+
+def test_schedule_update_preserves_upstream_validation_and_stable_identifier():
+    class SchedulableTask:
+        support_schedule_task = True
+        visible = True
+
+    task = SchedulableTask()
+    current = SimpleNamespace(
+        name="Daily Task",
+        path="folder\\Daily Task",
+        read_only=False,
+        task_index=1,
+        task_identifier="",
+        trigger_type="Daily",
+        email_report=False,
+        enabled=True,
+        description="",
+        interval_days=0,
+        interval_hours=0,
+    )
+    replaced = []
+    cache = {current.name: current}
+    manager = SimpleNamespace(
+        cache=SimpleNamespace(
+            get=lambda name: cache.get(name), values=lambda: cache.values()
+        ),
+        replace_task=lambda **kwargs: replaced.append(kwargs) or True,
+    )
+    runtime = SimpleNamespace(
+        executor=SimpleNamespace(onetime_tasks=[task]),
+        schedule_manager=manager,
+        schedule_tasks=lambda: {"tasks": []},
+    )
+    _install_schedule_email_support(runtime)
+
+    runtime.update_schedule_task(current.path, {"task_index": 1})
+
+    assert replaced[0]["email_report"] is False
+    assert replaced[0]["task_identifier"] == (
+        f"{task.__class__.__module__}.{task.__class__.__name__}"
+    )
+
+
+def test_schedule_update_rejects_unavailable_task_index():
+    current = SimpleNamespace(
+        name="Removed Task",
+        path="folder\\Removed Task",
+        read_only=False,
+        task_index=1,
+        task_identifier="missing.module.Task",
+        trigger_type="Daily",
+        email_report=True,
+        enabled=True,
+        description="",
+        interval_days=0,
+        interval_hours=0,
+    )
+    manager = SimpleNamespace(
+        cache=SimpleNamespace(get=lambda _name: current, values=lambda: [current]),
+        replace_task=lambda **_kwargs: pytest.fail("invalid task must not be saved"),
+    )
+    runtime = SimpleNamespace(
+        executor=SimpleNamespace(onetime_tasks=[]),
+        schedule_manager=manager,
+    )
+    _install_schedule_email_support(runtime)
+
+    with pytest.raises(ValueError, match="Invalid scheduled task"):
+        runtime.update_schedule_task(current.path, {})
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("Teleport to Boss", "Boss Challenge"),
+        ("Boss", "Fenrico"),
+        ("Echo Pickup Method", "Run in Circle"),
+    ],
+)
+def test_slash_safe_task_config_route_updates_farm_echo_dropdown(key, value):
+    calls = []
+    runtime = SimpleNamespace(
+        set_task_config=lambda name, field, selected: calls.append(
+            (name, field, selected)
+        )
+        or {"name": name},
+    )
+    app = FastAPI()
+    _install_slash_safe_task_routes(app, runtime)
+    name = "🌀 Farm 4C Echo in Dungeon/World"
+    route = next(route for route in app.routes if route.path == "/api/tasks/{name:path}/config")
+    match, _scope = route.matches(
+        {
+            "type": "http",
+            "path": f"/api/tasks/{name}/config",
+            "method": "POST",
+            "root_path": "",
+        }
+    )
+
+    response = asyncio.run(route.endpoint(name, {"key": key, "value": value}))
+
+    assert match is Match.FULL
+    assert response == {"name": name}
+    assert calls == [(name, key, value)]
+
+
+def test_slash_safe_task_routes_cover_start_action_and_reset():
+    calls = []
+    runtime = SimpleNamespace(
+        start_task=lambda name: calls.append(("start", name)) or {},
+        task_action=lambda name, action: calls.append((action, name)) or {},
+        reset_task_config=lambda name: calls.append(("reset", name)) or {},
+    )
+    app = FastAPI()
+    _install_slash_safe_task_routes(app, runtime)
+    name = "🌀 Farm 4C Echo in Dungeon/World"
+    endpoints = {route.path: route.endpoint for route in app.routes}
+
+    asyncio.run(endpoints["/api/tasks/{name:path}/start"](name))
+    asyncio.run(endpoints["/api/tasks/{name:path}/action"](name, {"action": "stop"}))
+    asyncio.run(endpoints["/api/tasks/{name:path}/config/reset"](name))
+    assert calls == [("start", name), ("stop", name), ("reset", name)]
+
+
 def test_default_web_language_bootstrap_preserves_saved_choice():
     result = _inject_default_web_language(
         '<html><script type="module" src="/static/app.js"></script></html>',
@@ -245,6 +392,142 @@ def test_failed_task_state_releases_cloud_game_and_allows_next_task():
     assert session.stops == 1
     runtime.start_task("DailyTask")
     assert starts == ["DailyTask", "DailyTask"]
+
+
+def test_scheduled_task_sends_success_email_report(monkeypatch):
+    reports = []
+    task = SimpleNamespace(running=True, name="Daily Task")
+    runtime, *_ = make_runtime(task)
+    task_done = FakeSignal()
+    notifier = SimpleNamespace(
+        send_task_report=lambda **kwargs: reports.append(kwargs)
+    )
+    controller = CloudWebController(
+        runtime,
+        FakeSession(),
+        FakeProfile(True),
+        failure_notifier=notifier,
+        task_done_signal=task_done,
+    )
+    monkeypatch.setattr(threading.Thread, "start", lambda self: self.run())
+
+    controller.enqueue_scheduled(
+        ScheduledTaskRequest(
+            schedule_id="daily",
+            task_id="src.task.DailyTask.DailyTask",
+            due_at=datetime.now(UTC),
+            attempted_at=datetime.now(UTC),
+            email_report=True,
+            schedule_name="每日任务",
+        )
+    )
+    task_done.callback(task)
+
+    assert reports == [
+        {
+            "schedule_name": "每日任务",
+            "task_name": "Daily Task",
+            "succeeded": True,
+            "details": "",
+        }
+    ]
+
+
+def test_scheduled_task_does_not_send_report_when_disabled(monkeypatch):
+    reports = []
+    task = SimpleNamespace(running=True, name="Daily Task")
+    runtime, *_ = make_runtime(task)
+    task_done = FakeSignal()
+    controller = CloudWebController(
+        runtime,
+        FakeSession(),
+        FakeProfile(True),
+        failure_notifier=SimpleNamespace(
+            send_task_report=lambda **kwargs: reports.append(kwargs)
+        ),
+        task_done_signal=task_done,
+    )
+    monkeypatch.setattr(threading.Thread, "start", lambda self: self.run())
+
+    controller.enqueue_scheduled(
+        ScheduledTaskRequest(
+            schedule_id="daily",
+            task_id="src.task.DailyTask.DailyTask",
+            due_at=datetime.now(UTC),
+            attempted_at=datetime.now(UTC),
+            email_report=False,
+        )
+    )
+    task_done.callback(task)
+
+    assert reports == []
+
+
+def test_failed_scheduled_task_sends_failure_email_report(monkeypatch):
+    reports = []
+    task = SimpleNamespace(running=False, name="Daily Task")
+    runtime, *_ = make_runtime(task)
+    task_state = FakeSignal()
+    controller = CloudWebController(
+        runtime,
+        FakeSession(),
+        FakeProfile(True),
+        failure_notifier=SimpleNamespace(
+            send_task_report=lambda **kwargs: reports.append(kwargs)
+        ),
+        task_state_signal=task_state,
+    )
+    monkeypatch.setattr(threading.Thread, "start", lambda self: self.run())
+
+    controller.enqueue_scheduled(
+        ScheduledTaskRequest(
+            schedule_id="daily",
+            task_id="src.task.DailyTask.DailyTask",
+            due_at=datetime.now(UTC),
+            attempted_at=datetime.now(UTC),
+            schedule_name="每日任务",
+        )
+    )
+    task.running = True
+    task_state.callback(task)
+    task.running = False
+    task_state.callback(None)
+
+    assert reports[0]["succeeded"] is False
+    assert reports[0]["details"] == "任务异常结束或被停止"
+
+
+def test_email_report_thread_start_failure_does_not_break_task_completion(
+    monkeypatch,
+):
+    task = SimpleNamespace(running=True, name="Daily Task")
+    runtime, *_ = make_runtime(task)
+    task_done = FakeSignal()
+    controller = CloudWebController(
+        runtime,
+        FakeSession(),
+        FakeProfile(True),
+        failure_notifier=SimpleNamespace(send_task_report=lambda **_kwargs: None),
+        task_done_signal=task_done,
+    )
+    monkeypatch.setattr(
+        threading.Thread,
+        "start",
+        lambda _self: (_ for _ in ()).throw(RuntimeError("no thread resources")),
+    )
+
+    controller.enqueue_scheduled(
+        ScheduledTaskRequest(
+            schedule_id="daily",
+            task_id="src.task.DailyTask.DailyTask",
+            due_at=datetime.now(UTC),
+            attempted_at=datetime.now(UTC),
+        )
+    )
+
+    task_done.callback(task)
+
+    assert controller.manual_game_status()["task_running"] is False
 
 
 def test_queued_task_ignores_unrelated_idle_state_before_starting():

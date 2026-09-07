@@ -74,16 +74,34 @@ class SmtpFailureNotifier:
         self.settings = settings
 
     def __call__(self, error: Exception) -> None:
-        message = EmailMessage()
-        message["Subject"] = "【OK-WW】云游戏登录会话已失效"
-        message["From"] = self.settings.sender
-        message["To"] = self.settings.recipient
-        message.set_content(
+        self._send(
+            "【OK-WW】云游戏登录会话已失效",
             "OK-WW 无人值守云游戏任务无法恢复登录会话。\n"
             f"具体原因：{type(error).__name__}: {error}\n"
             "请重新执行 enroll 登录初始化，并在浏览器中完成手动登录。\n"
-            "安全提示：本邮件不包含登录凭据、浏览器凭据或会话数据。"
+            "安全提示：本邮件不包含登录凭据、浏览器凭据或会话数据。",
         )
+
+    def send_task_report(
+        self, *, schedule_name: str, task_name: str, succeeded: bool, details: str = ""
+    ) -> None:
+        result = "成功" if succeeded else "失败或已停止"
+        body = (
+            f"计划任务：{schedule_name}\n"
+            f"执行任务：{task_name}\n"
+            f"执行结果：{result}\n"
+        )
+        if details:
+            body += f"详情：{details}\n"
+        body += "安全提示：本邮件不包含登录凭据、浏览器凭据或会话数据。"
+        self._send(f"【OK-WW】定时任务{result}：{schedule_name}", body)
+
+    def _send(self, subject: str, body: str) -> None:
+        message = EmailMessage()
+        message["Subject"] = subject
+        message["From"] = self.settings.sender
+        message["To"] = self.settings.recipient
+        message.set_content(body)
         smtp_class = smtplib.SMTP_SSL if self.settings.use_ssl else smtplib.SMTP
         smtp_kwargs = {"timeout": 30}
         if self.settings.use_ssl:
