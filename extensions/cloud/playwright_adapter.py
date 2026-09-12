@@ -259,6 +259,21 @@ class PlaywrightCloudPageAdapter:
     def observe(self) -> CloudPageState:
         return self._call_owner(self._observe_on_owner)
 
+    def is_closed(self) -> bool:
+        def check() -> bool:
+            page = self._page
+            if page is None or self._is_page_closed(page):
+                return True
+            # Pump Playwright events even when no capture/task is using the page.
+            # is_closed() alone only reads the last dispatched close event.
+            try:
+                page.wait_for_timeout(1)
+            except Exception:
+                return self._is_page_closed(page)
+            return self._is_page_closed(page)
+
+        return self._call_owner(check)
+
     def _observe_on_owner(self) -> CloudPageState:
         page = self._page
         if page is None or self._is_page_closed(page):

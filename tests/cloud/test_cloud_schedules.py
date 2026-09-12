@@ -180,7 +180,7 @@ def test_disabled_and_outside_window_schedules_are_not_enqueued(tmp_path):
     assert queued == []
 
 
-def test_enqueue_failure_is_still_an_attempt_and_is_not_retried(tmp_path):
+def test_enqueue_failure_is_still_an_attempt_and_is_not_retried(tmp_path, caplog):
     store = make_store(tmp_path)
     calls = []
 
@@ -194,6 +194,8 @@ def test_enqueue_failure_is_still_an_attempt_and_is_not_retried(tmp_path):
     assert len(dispatcher.run_pending(current)) == 1
     assert dispatcher.run_pending(current) == ()
     assert len(calls) == 1
+    assert "failed to start cloud schedule default-daily-task" in caplog.text
+    assert "queue unavailable" in caplog.text
     assert store.attempt_for(DEFAULT_SCHEDULE_ID) == {
         "local_date": "2026-09-06",
         "attempted_at": current.isoformat(),

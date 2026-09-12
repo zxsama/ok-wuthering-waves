@@ -8,6 +8,7 @@ the task queue and cloud browser session.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import threading
@@ -33,6 +34,7 @@ _TASK_ID_PATTERN = re.compile(
 )
 _SCHEDULE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _UNSET = object()
+logger = logging.getLogger(f"ok.{__name__}")
 
 
 class ScheduleNotFoundError(KeyError):
@@ -148,12 +150,15 @@ class CloudScheduleStore:
 
     _VERSION = 1
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, seed_default: bool = True) -> None:
         self.path = Path(path)
         self._lock = threading.RLock()
         with self._lock:
             if not self.path.exists():
-                self._save_document(self._default_document())
+                document = self._default_document()
+                if not seed_default:
+                    document["schedules"] = []
+                self._save_document(document)
             else:
                 self._load_document()
 
@@ -256,6 +261,20 @@ class CloudScheduleStore:
                 if value is not _UNSET
             }
             updated = replace(current, **changes)
+            # An edited trigger is a new occurrence. The old local-day claim
+            # must not suppress it (deleting/recreating used to be the only way
+            # to run a default that had already attempted today's old time).
+            timing_fields = (
+                "task_id", "run_at", "timezone", "trigger_type",
+                "interval_days", "interval_hours",
+            )
+            timing_changed = any(
+                getattr(current, key) != getattr(updated, key) for key in timing_fields
+            )
+            if updated.trigger_type != "Daily" and current.start_date != updated.start_date:
+                timing_changed = True
+            if timing_changed:
+                document["attempts"].pop(schedule_id, None)
             document["schedules"] = [
                 self._encode_schedule(updated) if item["id"] == schedule_id else item
                 for item in document["schedules"]
@@ -457,11 +476,13 @@ class CloudScheduleDispatcher:
             try:
                 self.enqueue(request)
             except Exception as exc:
+                logger.exception("failed to start cloud schedule %s (%s)", request.schedule_id, request.task_id)
                 self.store.record_enqueue_result(
                     request.schedule_id, request.claim_key, error=exc
                 )
             else:
                 self.store.record_enqueue_result(request.schedule_id, request.claim_key)
+                logger.info("started cloud schedule %s (%s)", request.schedule_id, request.task_id)
         return requests
 
 

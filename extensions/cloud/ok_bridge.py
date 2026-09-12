@@ -297,6 +297,9 @@ def create_cloud_ok_class(manager: CloudDeviceManager) -> type:
             if manager.capture_method is not None:
                 manager.capture_method.exit_event = self.exit_event
             super().__init__(config)
+            from .daily_task import install_daily_task_support
+
+            install_daily_task_support(self.task_executor)
 
         def init_device_manager(self) -> None:
             self.device_manager = manager

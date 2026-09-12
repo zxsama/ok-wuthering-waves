@@ -60,12 +60,25 @@ class CloudSession:
 
     def open(self, *, force_visible: bool = False) -> None:
         self._set_state(CloudSessionState.OPENING)
-        self.adapter.open(
-            url=self.settings.cloud_url,
-            profile_dir=self.profile.prepare(),
-            visible=force_visible or self.settings.browser_visible,
-        )
+        # Include partially opened adapters in cleanup after a launch failure.
         self._opened = True
+        try:
+            self.adapter.open(
+                url=self.settings.cloud_url,
+                profile_dir=self.profile.prepare(),
+                visible=force_visible or self.settings.browser_visible,
+            )
+        except BaseException:
+            self.stop()
+            raise
+
+    def browser_closed(self) -> bool:
+        if not self._opened:
+            return False
+        check = getattr(self.adapter, "is_closed", None)
+        if check is not None:
+            return bool(check())
+        return self.adapter.observe() == CloudPageState.CLOSED
 
     def enroll(self) -> None:
         """Wait for a human to complete login, then persist an enrollment marker."""
@@ -94,6 +107,8 @@ class CloudSession:
             self.sleeper(self.settings.poll_interval_seconds)
 
     def start_game(self, *, allow_manual_login: bool) -> None:
+        if self.browser_closed():
+            self.stop()
         if not self._opened:
             self.open(force_visible=allow_manual_login)
 

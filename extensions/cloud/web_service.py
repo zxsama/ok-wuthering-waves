@@ -28,7 +28,7 @@ from .task_runner import build_cloud_task_config
 from .update_control import DockerUpdateControl
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(f"ok.{__name__}")
 CHARACTER_CODE_WEB_TAB = [
     "extensions.cloud.character_code_task",
     "CloudCharacterCodeTask",
@@ -399,6 +399,8 @@ class CloudWebController:
         self._manual_game_thread: threading.Thread | None = None
         self._manual_game_error: str | None = None
         self._manual_game_stop_requested = False
+        self._monitor_stop = threading.Event()
+        self._monitor_thread: threading.Thread | None = None
         self._scheduled_request: ScheduledTaskRequest | None = None
         self.schedule_manager: Any = None
         self._original_start = runtime.start
@@ -423,6 +425,12 @@ class CloudWebController:
 
     def start(self):
         result = self._original_start()
+        if self._monitor_thread is None:
+            self._monitor_stop.clear()
+            self._monitor_thread = threading.Thread(
+                target=self._monitor_browser, name="cloud-browser-monitor", daemon=True
+            )
+            self._monitor_thread.start()
         if self.schedule_manager is not None:
             self.schedule_manager.start()
         return result
@@ -433,6 +441,8 @@ class CloudWebController:
                 raise RuntimeError("A Docker update is in progress")
             if self._active_task is not None:
                 raise RuntimeError("Another task is already running")
+            if self._manual_game_thread is not None and self._manual_game_thread.is_alive():
+                raise RuntimeError("The cloud game is still starting or stopping")
             task, _is_trigger = self.runtime.ok.get_task(task_identifier)
             self._active_task = task
             self._active_task_started = False
@@ -443,6 +453,9 @@ class CloudWebController:
                     self.session.settings.cloud_url
                 )
             try:
+                # Background triggers must not capture login/queue pages. The
+                # upstream task starter resumes the executor once in game.
+                self.runtime.pause()
                 self.session.start_game(allow_manual_login=allow_manual_login)
                 return self._original_start_task(task_identifier)
             except AuthenticationRequiredError as exc:
@@ -451,14 +464,14 @@ class CloudWebController:
                 self._active_task_started = False
                 if self._update_control is not None:
                     self._update_control.set_runtime_busy(False)
-                self.session.stop()
+                self._stop_game_session()
                 raise
             except BaseException:
                 self._active_task = None
                 self._active_task_started = False
                 if self._update_control is not None:
                     self._update_control.set_runtime_busy(False)
-                self.session.stop()
+                self._stop_game_session()
                 raise
 
     def enqueue_scheduled(self, request: ScheduledTaskRequest) -> object:
@@ -517,6 +530,10 @@ class CloudWebController:
                 if not self._manual_game_stop_requested:
                     logger.exception("manual cloud-game start failed")
                     self._manual_game_error = str(exc)
+                    try:
+                        self._stop_game_session()
+                    except Exception:
+                        logger.exception("failed to clean up cloud-game start")
             if self._update_control is not None:
                 self._update_control.set_runtime_busy(False)
 
@@ -528,7 +545,7 @@ class CloudWebController:
         if task_running:
             self.stop_task()
         else:
-            self.session.stop()
+            self._stop_game_session()
             if self._update_control is not None:
                 self._update_control.set_runtime_busy(False)
 
@@ -547,6 +564,37 @@ class CloudWebController:
         self._close_active_game()
         return result
 
+    def _stop_game_session(self) -> None:
+        # Keep trigger preferences intact; pause before disconnecting capture.
+        # Also publish executor_paused so the Web toolbar reflects idle state.
+        try:
+            self.runtime.pause()
+        finally:
+            self.session.stop()
+
+    def _monitor_browser(self) -> None:
+        while not self._monitor_stop.wait(1.0):
+            try:
+                self._check_browser_closed()
+            except Exception:
+                logger.exception("failed to check cloud browser state")
+
+    def _check_browser_closed(self) -> None:
+        with self._lock:
+            if self._manual_game_thread is not None and self._manual_game_thread.is_alive():
+                return
+            if not self.session.browser_closed():
+                return
+            logger.info("cloud browser was closed; stopping the session")
+            if self._active_task is not None:
+                # A queued task might not yet be executor.current_task.
+                self._original_task_action(self._active_task.name, "stop")
+                self._close_active_game()
+            else:
+                self._stop_game_session()
+                if self._update_control is not None:
+                    self._update_control.set_runtime_busy(False)
+
     def _close_active_game(
         self, task_identifier: str | None = None, *, succeeded: bool = False
     ) -> None:
@@ -562,13 +610,15 @@ class CloudWebController:
             self._active_task_started = False
             scheduled_request = self._scheduled_request
             self._scheduled_request = None
-        try:
-            self.session.stop()
-        except Exception:
-            logger.exception("failed to close the cloud-game tab")
-        finally:
-            if self._update_control is not None:
-                self._update_control.set_runtime_busy(False)
+            # Serialize teardown with start_task so completion cannot pause or
+            # close a session already opened by the next scheduled task.
+            try:
+                self._stop_game_session()
+            except Exception:
+                logger.exception("failed to close the cloud-game tab")
+            finally:
+                if self._update_control is not None:
+                    self._update_control.set_runtime_busy(False)
         if scheduled_request is not None and scheduled_request.email_report:
             self._send_scheduled_report(task, scheduled_request, succeeded=succeeded)
 
@@ -627,6 +677,10 @@ class CloudWebController:
             self._close_active_game()
 
     def close(self) -> None:
+        self._monitor_stop.set()
+        if self._monitor_thread is not None:
+            self._monitor_thread.join(timeout=2.0)
+            self._monitor_thread = None
         if self._task_done_signal is not None:
             try:
                 self._task_done_signal.disconnect(self._on_task_done)
@@ -640,7 +694,7 @@ class CloudWebController:
         try:
             if self.schedule_manager is not None:
                 self.schedule_manager.stop()
-            self.session.stop()
+            self._stop_game_session()
         finally:
             if self._update_control is not None:
                 self._update_control.set_runtime_busy(False)
@@ -764,10 +818,14 @@ def create_cloud_web_app(
     if schedule_manager_factory is None:
         from .cloud_schedule_manager import CloudScheduleManager
 
-        schedule_manager_factory = CloudScheduleManager
-    schedule_manager = schedule_manager_factory(
-        settings.data_dir / "schedules.json", controller.enqueue_scheduled
-    )
+        schedule_manager = CloudScheduleManager(
+            settings.data_dir / "schedules.json", controller.enqueue_scheduled,
+            onetime_tasks=runtime.executor.onetime_tasks,
+        )
+    else:
+        schedule_manager = schedule_manager_factory(
+            settings.data_dir / "schedules.json", controller.enqueue_scheduled
+        )
     runtime._schedule_manager = schedule_manager
     controller.schedule_manager = schedule_manager
     app.state.cloud_schedule_manager = schedule_manager

@@ -1,6 +1,7 @@
 import asyncio
 import threading
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -52,12 +53,17 @@ class FakeSession:
         self.starts = []
         self.stops = 0
         self.state = "closed"
+        self.page_closed = False
+
+    def browser_closed(self):
+        return self.page_closed and self.state == "in_game"
 
     def start_game(self, *, allow_manual_login):
         self.starts.append(allow_manual_login)
         if self.error:
             raise self.error
         self.state = "in_game"
+        self.page_closed = False
 
     def stop(self):
         self.stops += 1
@@ -71,9 +77,17 @@ def make_runtime(task):
     stops = []
     closes = []
     runtime = SimpleNamespace()
+    runtime.executor = SimpleNamespace(paused=True)
     runtime.ok = SimpleNamespace(get_task=lambda identifier: (task, False))
     runtime.start = lambda: starts_runtime.append(True) or True
-    runtime.start_task = lambda identifier: starts.append(identifier) or {"name": identifier}
+
+    def start_task(identifier):
+        runtime.executor.paused = False
+        starts.append(identifier)
+        return {"name": identifier}
+
+    runtime.start_task = start_task
+    runtime.pause = lambda: setattr(runtime.executor, "paused", True)
     runtime.task_action = lambda identifier, action: actions.append((identifier, action)) or {}
     runtime.stop_task = lambda: stops.append(True) or {}
     runtime.close = lambda: closes.append(True)
@@ -139,7 +153,11 @@ def test_running_version_prefers_container_build_metadata(monkeypatch):
 def test_running_version_uses_packaged_release_when_build_metadata_is_dev(monkeypatch):
     monkeypatch.setenv("OK_WW_BUILD_VERSION", "dev")
 
-    assert _running_version({"version": "dev"}) == "v1.0.7"
+    packaged_version = (Path(__file__).resolve().parents[2] / "VERSION").read_text(
+        encoding="utf-8"
+    ).strip()
+    assert packaged_version.startswith("v")
+    assert _running_version({"version": "dev"}) == packaged_version
 
 
 def test_cloud_game_button_does_not_cover_header_actions():
@@ -366,6 +384,7 @@ def test_first_manual_start_allows_enrollment_then_closes_only_game_on_done():
 
     assert starts == ["DailyTask"]
     assert session.stops == 1
+    assert runtime.executor.paused is True
     assert closes == []
 
 
@@ -390,8 +409,10 @@ def test_failed_task_state_releases_cloud_game_and_allows_next_task():
 
     assert controller.manual_game_status()["task_running"] is False
     assert session.stops == 1
+    assert runtime.executor.paused is True
     runtime.start_task("DailyTask")
     assert starts == ["DailyTask", "DailyTask"]
+    assert runtime.executor.paused is False
 
 
 def test_scheduled_task_sends_success_email_report(monkeypatch):
@@ -611,6 +632,7 @@ def test_saved_login_failure_sends_notification_and_closes_game_page():
     assert session.starts == [False]
     assert notifications == [error]
     assert session.stops == 1
+    assert runtime.executor.paused is True
 
 
 def test_scheduled_start_never_waits_for_manual_login():
@@ -646,11 +668,13 @@ def test_stopping_a_task_closes_only_the_game_session():
 
     assert actions == [("DailyTask", "stop")]
     assert session.stops == 1
+    assert runtime.executor.paused is True
     assert closes == []
     runtime.start_task("DailyTask")
     runtime.stop_task()
     assert stops == [True]
     assert session.stops == 2
+    assert runtime.executor.paused is True
 
 
 def test_runtime_lifecycle_starts_and_stops_schedule_manager():
@@ -678,12 +702,81 @@ def test_manual_cloud_game_start_and_stop():
     starting = controller.start_game_manually()
     controller._manual_game_thread.join(timeout=1)
     running = controller.manual_game_status()
+    runtime.executor.paused = False
     stopped = controller.stop_game_manually()
 
     assert starting["running"] is True
     assert session.starts == [True]
     assert running["running"] is True
     assert stopped["running"] is False
+    assert session.stops == 1
+    assert runtime.executor.paused is True
+
+
+def test_task_completion_pauses_before_browser_disconnect_and_preserves_triggers():
+    task = object()
+    runtime, *_ = make_runtime(task)
+    trigger = SimpleNamespace(enabled=True)
+    runtime.executor.trigger_tasks = [trigger]
+    session = FakeSession()
+    order = []
+    original_pause = runtime.pause
+    original_stop = session.stop
+
+    def pause():
+        order.append("pause")
+        original_pause()
+
+    def stop():
+        assert runtime.executor.paused is True
+        order.append("close")
+        original_stop()
+
+    runtime.pause = pause
+    session.stop = stop
+    controller = CloudWebController(runtime, session, FakeProfile(True))
+    controller.install()
+    runtime.start_task("DailyTask")
+    order.clear()
+
+    controller._on_task_done(task)
+
+    assert order == ["pause", "close"]
+    assert trigger.enabled is True
+    assert runtime.executor.paused is True
+
+
+def test_executor_stays_paused_while_game_is_starting_then_resumes():
+    runtime, *_ = make_runtime(object())
+    runtime.executor.paused = False
+    session = FakeSession()
+    original_start = session.start_game
+
+    def start_game(**kwargs):
+        assert runtime.executor.paused is True
+        original_start(**kwargs)
+
+    session.start_game = start_game
+    controller = CloudWebController(runtime, session, FakeProfile(True))
+    controller.install()
+
+    runtime.start_task("DailyTask")
+
+    assert runtime.executor.paused is False
+
+
+def test_teardown_disconnects_browser_even_if_pausing_fails():
+    runtime, *_ = make_runtime(object())
+    session = FakeSession()
+    controller = CloudWebController(runtime, session, FakeProfile(True))
+
+    def pause():
+        raise RuntimeError("pause failed")
+
+    runtime.pause = pause
+    with pytest.raises(RuntimeError, match="pause failed"):
+        controller.stop_game_manually()
+
     assert session.stops == 1
 
 
@@ -702,6 +795,7 @@ def test_manual_cloud_game_stop_interrupts_active_task():
     assert session.stops == 1
     assert stopped["running"] is False
     assert stopped["task_running"] is False
+    assert runtime.executor.paused is True
 
 
 def test_manual_cloud_game_reports_stopped_while_start_thread_exits():
@@ -715,3 +809,64 @@ def test_manual_cloud_game_reports_stopped_while_start_thread_exits():
 
     assert status["running"] is False
     assert status["busy"] is False
+
+
+def test_closed_manual_browser_releases_state_and_can_start_again():
+    runtime, *_ = make_runtime(object())
+    session = FakeSession()
+    controller = CloudWebController(runtime, session, FakeProfile(False))
+    controller.start_game_manually()
+    controller._manual_game_thread.join(timeout=2)
+    runtime.executor.paused = False
+    session.page_closed = True
+
+    controller._check_browser_closed()
+
+    assert controller.manual_game_status()["running"] is False
+    assert runtime.executor.paused is True
+    controller.start_game_manually()
+    controller._manual_game_thread.join(timeout=2)
+    assert controller.manual_game_status()["running"] is True
+    assert len(session.starts) == 2
+
+
+def test_closed_browser_stops_even_queued_task_and_allows_next_start():
+    task = SimpleNamespace(name="DailyTask", running=False)
+    runtime, _, starts, actions, *_ = make_runtime(task)
+    session = FakeSession()
+    controller = CloudWebController(runtime, session, FakeProfile(True))
+    controller.start_task(task.name)
+    session.page_closed = True
+
+    controller._check_browser_closed()
+
+    assert actions == [(task.name, "stop")]
+    assert controller._active_task is None
+    assert runtime.executor.paused is True
+    controller.start_task(task.name)
+    assert starts == [task.name, task.name]
+
+
+def test_failed_manual_start_cleans_session_before_retry():
+    runtime, *_ = make_runtime(object())
+    session = FakeSession(error=RuntimeError("page closed"))
+    controller = CloudWebController(runtime, session, FakeProfile(False))
+    controller.start_game_manually()
+    controller._manual_game_thread.join(timeout=2)
+    assert session.stops == 1
+    assert runtime.executor.paused is True
+    session.error = None
+    controller.start_game_manually()
+    controller._manual_game_thread.join(timeout=2)
+    assert controller.manual_game_status()["running"] is True
+    assert controller.manual_game_status()["error"] is None
+
+
+def test_task_cannot_share_browser_with_unfinished_manual_start():
+    runtime, *_ = make_runtime(object())
+    session = FakeSession()
+    controller = CloudWebController(runtime, session, FakeProfile(False))
+    controller._manual_game_thread = SimpleNamespace(is_alive=lambda: True)
+    with pytest.raises(RuntimeError, match="still starting or stopping"):
+        controller.start_task("DailyTask")
+    assert session.starts == []

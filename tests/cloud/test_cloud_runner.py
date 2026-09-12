@@ -38,6 +38,40 @@ def make_session(tmp_path, states, *, enrolled=False):
     return settings, profile, adapter, session
 
 
+def test_start_game_reopens_externally_closed_browser(tmp_path):
+    _, _, adapter, session = make_session(tmp_path, [CloudPageState.IN_GAME])
+    session.start_game(allow_manual_login=True)
+    adapter.current = CloudPageState.CLOSED
+    original_open = adapter.open
+
+    def reopen(**kwargs):
+        original_open(**kwargs)
+        adapter.current = CloudPageState.IN_GAME
+
+    adapter.open = reopen
+    session.start_game(allow_manual_login=True)
+
+    assert adapter.actions == ["close"]
+    assert session.state == CloudSessionState.IN_GAME
+
+
+def test_failed_browser_launch_cleans_partial_session_and_can_retry(tmp_path):
+    _, _, adapter, session = make_session(tmp_path, [CloudPageState.IN_GAME])
+    original_open = adapter.open
+
+    def fail(**kwargs):
+        raise CloudPageError("launch interrupted")
+
+    adapter.open = fail
+    with pytest.raises(CloudPageError, match="launch interrupted"):
+        session.start_game(allow_manual_login=True)
+    assert adapter.actions == ["close"]
+    assert session.state == CloudSessionState.CLOSED
+    adapter.open = original_open
+    session.start_game(allow_manual_login=True)
+    assert session.state == CloudSessionState.IN_GAME
+
+
 def test_enroll_waits_for_manual_login_and_marks_profile(tmp_path):
     settings, profile, adapter, session = make_session(
         tmp_path,

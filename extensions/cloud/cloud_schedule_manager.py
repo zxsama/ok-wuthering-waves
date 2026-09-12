@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import threading
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Sequence
 
 from ok.util.windows_schedule import (
     ScheduleTaskInfo,
@@ -17,7 +18,10 @@ from ok.util.windows_schedule import (
 )
 
 from .cloud_schedules import (
+    DEFAULT_DAILY_TASK_ID,
     DEFAULT_MISSED_WINDOW_MINUTES,
+    DEFAULT_RUN_AT,
+    DEFAULT_SCHEDULE_ID,
     DEFAULT_TIMEZONE,
     CloudSchedule,
     CloudScheduleDispatcher,
@@ -26,6 +30,9 @@ from .cloud_schedules import (
     _parse_timezone,
 )
 from .models import CloudConfigurationError
+
+
+logger = logging.getLogger(f"ok.{__name__}")
 
 
 @dataclass
@@ -79,8 +86,11 @@ class CloudScheduleManager:
         missed_window_minutes: int = DEFAULT_MISSED_WINDOW_MINUTES,
         poll_interval: float = 30.0,
         now: Callable[[], datetime] | None = None,
+        onetime_tasks: Sequence[Any] | None = None,
+        default_run_at: str = DEFAULT_RUN_AT,
     ) -> None:
-        self.store = CloudScheduleStore(Path(path))
+        new_store = not Path(path).exists()
+        self.store = CloudScheduleStore(Path(path), seed_default=onetime_tasks is None)
         self.enqueue = enqueue
         self.timezone = timezone
         self.missed_window_minutes = missed_window_minutes
@@ -94,6 +104,44 @@ class CloudScheduleManager:
         self.sync_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self.query_all_tasks(force_sync=True)
+        if onetime_tasks is not None:
+            self._initialize_daily_task(onetime_tasks, new_store, default_run_at)
+
+    def _initialize_daily_task(self, tasks, new_store: bool, run_at: str) -> None:
+        for index, task in enumerate(tasks, 1):
+            task_id = f"{type(task).__module__}.{type(task).__name__}"
+            if task_id != DEFAULT_DAILY_TASK_ID or not getattr(task, "support_schedule_task", False):
+                continue
+            if new_store:
+                hour, minute = (int(part) for part in run_at.split(":"))
+                # Use exactly the manager entry point called by the native Web
+                # schedule form, with the registered task's current metadata.
+                if not self.create_task(
+                    task_name=task.name,
+                    task_index=index,
+                    task_identifier=task_id,
+                    trigger_type=TriggerType.DAILY,
+                    start_hour=hour,
+                    start_minute=minute,
+                    schedule_id=DEFAULT_SCHEDULE_ID,
+                ):
+                    raise CloudConfigurationError("cannot create the default daily schedule")
+            else:
+                # Repair old defaults in place. Keep the user's timing, disabled
+                # state and attempt record; never recreate a deleted default.
+                for schedule in self.store.list():
+                    if schedule.id == DEFAULT_SCHEDULE_ID and schedule.task_id == task_id:
+                        self.store.update(
+                            schedule.id,
+                            name=schedule.name or task.name,
+                            task_index=index,
+                            start_date=schedule.start_date or self._now().astimezone(
+                                _parse_timezone(schedule.timezone)
+                            ).date().isoformat(),
+                        )
+                        self._refresh_and_notify(schedule.id)
+                        break
+            return
 
     def register_update_callback(self, callback) -> None:
         with self.lock:
@@ -126,6 +174,7 @@ class CloudScheduleManager:
         interval_days: int = 0,
         interval_hours: int = 0,
         task_identifier: str | None = None,
+        schedule_id: str | None = None,
     ) -> bool:
         try:
             trigger = normalize_trigger_type(
@@ -140,7 +189,7 @@ class CloudScheduleManager:
             start_day = now.date()
             if trigger == TriggerType.ONCE and (hour, minute) <= (now.hour, now.minute):
                 start_day += timedelta(days=1)
-            schedule_id = self._new_id(task_name)
+            schedule_id = schedule_id or self._new_id(task_name)
             schedule = self.store.create(
                 schedule_id=schedule_id,
                 task_id=task_id,
@@ -266,7 +315,7 @@ class CloudScheduleManager:
                 self.run_pending()
             except Exception:
                 # The dispatcher's persistent attempt record prevents tight retries.
-                pass
+                logger.exception("cloud schedule polling failed")
             self._stop_event.wait(self.poll_interval)
 
     def _set_enabled(self, task_name: str, enabled: bool) -> bool:

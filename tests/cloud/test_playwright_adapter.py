@@ -159,6 +159,24 @@ def attach_page(page, *, timeout=0.001):
     return adapter
 
 
+def test_closed_browser_is_detected_on_owner_and_can_be_reopened(tmp_path):
+    page = FakePage()
+    adapter, chromium, playwright = make_open_adapter(page)
+    adapter.open(url="https://cloud.invalid/", profile_dir=tmp_path, visible=True)
+    assert adapter.is_closed() is False
+    page.closed = True
+    assert adapter.is_closed() is True
+    adapter.close()
+    assert playwright.stopped is True
+    chromium.page = FakePage()
+    adapter.open(url="https://cloud.invalid/", profile_dir=tmp_path, visible=True)
+    try:
+        assert adapter.is_closed() is False
+        assert len(chromium.launches) == 2
+    finally:
+        adapter.close()
+
+
 def test_open_uses_persistent_profile_and_falls_back_to_edge(tmp_path):
     page = FakePage()
     adapter, chromium, playwright = make_open_adapter(

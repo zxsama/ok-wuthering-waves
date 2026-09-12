@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import time
+from dataclasses import asdict
 from datetime import UTC, datetime
 
 from ok.util.windows_schedule import ScheduleTaskInfo, TriggerType
 
 from extensions.cloud.cloud_schedule_manager import CloudScheduleManager
-from extensions.cloud.cloud_schedules import DEFAULT_DAILY_TASK_ID, DEFAULT_SCHEDULE_ID
+from extensions.cloud.cloud_schedules import (
+    DEFAULT_DAILY_TASK_ID, DEFAULT_SCHEDULE_ID, CloudScheduleStore,
+)
 
 
 def make_manager(tmp_path, queued=None, **kwargs):
@@ -16,6 +19,103 @@ def make_manager(tmp_path, queued=None, **kwargs):
         now=kwargs.pop("now", lambda: datetime(2026, 9, 6, 0, 0, tzinfo=UTC)),
         **kwargs,
     )
+
+
+def registered_daily_task():
+    task_type = type("DailyTask", (), {"__module__": "src.task.DailyTask"})
+    task = task_type()
+    task.name = "📅 Daily Task"
+    task.support_schedule_task = True
+    return task
+
+
+def test_default_uses_native_creation_metadata_and_dispatches_same_task(tmp_path):
+    daily = registered_daily_task()
+    queued = []
+    manager = make_manager(tmp_path, queued, onetime_tasks=[object(), daily])
+    default = manager.store.get(DEFAULT_SCHEDULE_ID)
+    assert manager.create_task(
+        daily.name, 2, TriggerType.DAILY,
+        start_hour=4, start_minute=0, task_identifier=DEFAULT_DAILY_TASK_ID,
+    )
+    manual = next(item for item in manager.store.list() if item.id != default.id)
+    assert {k: v for k, v in asdict(default).items() if k != "id"} == {
+        k: v for k, v in asdict(manual).items() if k != "id"
+    }
+    assert default.task_index == 2
+    assert default.name == daily.name
+    requests = manager.run_pending(datetime(2026, 9, 6, 20, 0, 1, tzinfo=UTC))
+    assert len(requests) == 2
+    assert [request.task_id for request in queued] == [DEFAULT_DAILY_TASK_ID] * 2
+    assert manager.store.attempt_for(default.id)["status"] == "queued"
+
+
+def test_legacy_default_migration_keeps_user_settings_and_attempt_history(tmp_path):
+    store = CloudScheduleStore(tmp_path / "schedules.json")
+    store.update(DEFAULT_SCHEDULE_ID, run_at="08:30", auto_exit=False, email_report=False)
+    store.claim_due(datetime(2026, 9, 6, 0, 30, tzinfo=UTC))
+    store.record_enqueue_result(DEFAULT_SCHEDULE_ID, "2026-09-06")
+    store.set_enabled(DEFAULT_SCHEDULE_ID, False)
+    attempt = store.attempt_for(DEFAULT_SCHEDULE_ID)
+
+    manager = make_manager(tmp_path, onetime_tasks=[registered_daily_task()])
+    migrated = manager.store.get(DEFAULT_SCHEDULE_ID)
+    assert migrated.run_at == "08:30"
+    assert migrated.enabled is False
+    assert migrated.auto_exit is False
+    assert migrated.email_report is False
+    assert migrated.task_index == 1
+    assert migrated.name == "📅 Daily Task"
+    assert manager.store.attempt_for(DEFAULT_SCHEDULE_ID) == attempt
+
+
+def test_restart_does_not_recreate_deleted_default_or_duplicate_manual_daily(tmp_path):
+    manager = make_manager(tmp_path, onetime_tasks=[registered_daily_task()])
+    assert manager.delete_task(rf"\Cloud\{DEFAULT_SCHEDULE_ID}")
+    assert manager.create_task(
+        "My daily", 1, TriggerType.DAILY, task_identifier=DEFAULT_DAILY_TASK_ID,
+    )
+    existing = manager.store.list()
+    restarted = make_manager(tmp_path, onetime_tasks=[registered_daily_task()])
+    assert restarted.store.list() == existing
+
+
+def test_editing_default_time_runs_today_without_delete_and_recreate(tmp_path):
+    current = [datetime(2026, 9, 6, 20, 0, tzinfo=UTC)]
+    queued = []
+
+    def enqueue(request):
+        if not queued:
+            queued.append("initial failure")
+            raise RuntimeError("game unavailable at the original default time")
+        queued.append(request)
+
+    manager = CloudScheduleManager(
+        tmp_path / "schedules.json", enqueue,
+        now=lambda: current[0], onetime_tasks=[registered_daily_task()],
+    )
+    assert len(manager.run_pending()) == 1
+    assert manager.store.attempt_for(DEFAULT_SCHEDULE_ID)["status"] == "enqueue_failed"
+    assert manager.run_pending() == ()
+    assert manager.replace_task(
+        rf"\Cloud\{DEFAULT_SCHEDULE_ID}", 1, TriggerType.DAILY,
+        start_hour=9, task_identifier=DEFAULT_DAILY_TASK_ID,
+    )
+    current[0] = datetime(2026, 9, 7, 1, 0, tzinfo=UTC)
+    assert len(manager.run_pending()) == 1
+    assert queued[-1].schedule_id == DEFAULT_SCHEDULE_ID
+    assert manager.run_pending() == ()
+
+
+def test_editing_only_report_option_does_not_repeat_completed_default(tmp_path):
+    current = datetime(2026, 9, 6, 20, 0, tzinfo=UTC)
+    manager = make_manager(tmp_path, now=lambda: current, onetime_tasks=[registered_daily_task()])
+    assert len(manager.run_pending()) == 1
+    assert manager.replace_task(
+        rf"\Cloud\{DEFAULT_SCHEDULE_ID}", 1, TriggerType.DAILY,
+        start_hour=4, email_report=False, task_identifier=DEFAULT_DAILY_TASK_ID,
+    )
+    assert manager.run_pending() == ()
 
 
 def test_default_daily_task_is_exposed_as_web_schedule_info(tmp_path):
