@@ -298,8 +298,10 @@ def create_cloud_ok_class(manager: CloudDeviceManager) -> type:
                 manager.capture_method.exit_event = self.exit_event
             super().__init__(config)
             from .daily_task import install_daily_task_support
+            from .tacet_task import install_tacet_task_support
 
             install_daily_task_support(self.task_executor)
+            install_tacet_task_support(self.task_executor)
 
         def init_device_manager(self) -> None:
             self.device_manager = manager
