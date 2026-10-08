@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from extensions.cloud.models import CloudPageError
 from extensions.cloud.playwright_adapter import PlaywrightCloudPageAdapter
 
 
@@ -148,8 +149,39 @@ class DockerPlaywrightCloudPageAdapter(PlaywrightCloudPageAdapter):
         self.launch_args = (*app_args, f"--app={url}")
         try:
             super().open(url=url, profile_dir=profile_dir, visible=visible)
+            if visible:
+                try:
+                    self.call_page(self._ensure_fullscreen)
+                except Exception as exc:
+                    self.close()
+                    raise CloudPageError("cannot enter cloud browser fullscreen") from exc
         finally:
             self.launch_args = original_launch_args
+
+    @staticmethod
+    def _ensure_fullscreen(page: Any) -> None:
+        # Playwright resizes headed persistent windows when applying a fixed
+        # viewport. That can undo Chrome's startup fullscreen flags and leave
+        # Openbox decorations clipping the page. Apply fullscreen afterward
+        # on the browser owner thread, keeping capture and input coordinates.
+        session = page.context.new_cdp_session(page)
+        try:
+            window_id = session.send("Browser.getWindowForTarget")["windowId"]
+            session.send("Browser.setWindowBounds", {
+                "windowId": window_id,
+                "bounds": {"windowState": "fullscreen"},
+            })
+            page.wait_for_function(
+                "() => window.screenX === 0 && window.screenY === 0 && "
+                "window.outerWidth >= window.innerWidth && "
+                "window.outerHeight >= window.innerHeight",
+                timeout=5000,
+            )
+            bounds = session.send("Browser.getWindowBounds", {"windowId": window_id})["bounds"]
+            if bounds.get("windowState") != "fullscreen":
+                raise CloudPageError("cloud browser window did not enter fullscreen")
+        finally:
+            session.detach()
 
 
 def create_playwright_adapter() -> PlaywrightCloudPageAdapter:

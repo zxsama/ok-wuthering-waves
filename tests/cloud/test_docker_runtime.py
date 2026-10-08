@@ -9,6 +9,7 @@ import pytest
 
 from docker import patch_ok_script_wheel
 from docker.playwright_adapter import DockerPlaywrightCloudPageAdapter
+from extensions.cloud.models import CloudPageError
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -238,6 +239,10 @@ def test_docker_adapter_removes_stale_chrome_singletons(tmp_path, monkeypatch):
         "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.open",
         record_open,
     )
+    monkeypatch.setattr(
+        "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.call_page",
+        lambda adapter, callback: calls.append("fullscreen"),
+    )
 
     adapter = DockerPlaywrightCloudPageAdapter(
         ignore_default_args=(), launch_args=("--kiosk",)
@@ -248,8 +253,47 @@ def test_docker_adapter_removes_stale_chrome_singletons(tmp_path, monkeypatch):
     assert calls == [(
         {"url": "https://example.test", "profile_dir": profile, "visible": True},
         ("--kiosk", "--app=https://example.test"),
-    )]
+    ), "fullscreen"]
     assert adapter.launch_args == ("--kiosk",)
+
+
+def test_docker_adapter_closes_browser_when_fullscreen_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.open",
+        lambda adapter, **kwargs: None,
+    )
+    def fail_fullscreen(adapter, callback):
+        raise RuntimeError("window manager rejected fullscreen")
+    monkeypatch.setattr(
+        "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.call_page",
+        fail_fullscreen,
+    )
+    closed = []
+    monkeypatch.setattr(
+        "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.close",
+        lambda adapter: closed.append(adapter),
+    )
+    adapter = DockerPlaywrightCloudPageAdapter(launch_args=("--kiosk",))
+    with pytest.raises(CloudPageError, match="cannot enter cloud browser fullscreen"):
+        adapter.open(url="https://example.test", profile_dir=tmp_path, visible=True)
+    assert closed == [adapter]
+    assert adapter.launch_args == ("--kiosk",)
+
+
+def test_docker_adapter_headless_open_skips_native_fullscreen(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.open",
+        lambda adapter, **kwargs: None,
+    )
+    def unexpected_fullscreen(adapter, callback):
+        pytest.fail("headless browsers must not request native fullscreen")
+    monkeypatch.setattr(
+        "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.call_page",
+        unexpected_fullscreen,
+    )
+    DockerPlaywrightCloudPageAdapter().open(
+        url="https://example.test", profile_dir=tmp_path, visible=False,
+    )
 
 
 def test_docker_adapter_marks_profile_exit_normal_without_losing_data(
@@ -273,6 +317,7 @@ def test_docker_adapter_marks_profile_exit_normal_without_losing_data(
         "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.open",
         lambda self, **kwargs: calls.append(kwargs),
     )
+    monkeypatch.setattr(DockerPlaywrightCloudPageAdapter, "call_page", lambda self, callback: None)
 
     DockerPlaywrightCloudPageAdapter().open(
         url="https://example.test", profile_dir=profile, visible=True
@@ -299,6 +344,7 @@ def test_docker_adapter_creates_safe_preferences_for_new_profile(
         "extensions.cloud.playwright_adapter.PlaywrightCloudPageAdapter.open",
         lambda self, **kwargs: None,
     )
+    monkeypatch.setattr(DockerPlaywrightCloudPageAdapter, "call_page", lambda self, callback: None)
 
     DockerPlaywrightCloudPageAdapter().open(
         url="https://example.test", profile_dir=profile, visible=True
