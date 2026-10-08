@@ -1386,3 +1386,15 @@ msgstr "チームを削除しました。"
 
 msgid "Send Email Report After Task"
 msgstr "タスク完了後にメールレポートを送信"
+
+msgid "Rover: Electro"
+msgstr "漂泊者・電導"
+
+msgid "JingRan"
+msgstr "景燃"
+
+msgid "Special Nightmare"
+msgstr "特異悪夢"
+
+msgid "Which Special Nightmare to Teleport"
+msgstr "テレポートする特異悪夢"

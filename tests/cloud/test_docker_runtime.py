@@ -374,7 +374,7 @@ def test_compatibility_wheel_removes_only_declared_cloud_unused_dependencies(
         [
             b"Metadata-Version: 2.4\n",
             b"Name: ok-script\n",
-            b"Version: 2.0.7b1\n",
+            b"Version: 2.0.8\n",
             b"Requires-Dist: requests>=2.32.3\n",
             b"Requires-Dist: pywin32!=312,>=306\n",
             b"Requires-Dist: pydirectinput==1.0.4\n",

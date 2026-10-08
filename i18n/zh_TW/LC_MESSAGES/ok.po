@@ -1513,3 +1513,18 @@ msgstr "隊伍已刪除。"
 
 msgid "Send Email Report After Task"
 msgstr "任務完成後傳送郵件報告"
+
+msgid "Rover: Electro"
+msgstr "漂泊者·導電"
+
+msgid "JingRan"
+msgstr "景燃"
+
+msgid "Hsin"
+msgstr "心"
+
+msgid "Special Nightmare"
+msgstr "特異夢魘"
+
+msgid "Which Special Nightmare to Teleport"
+msgstr "傳送到第幾個特異夢魘"

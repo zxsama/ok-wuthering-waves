@@ -26,7 +26,7 @@ from src.task.DailyTask import DailyTask
 from src.task.MouseResetTask import MouseResetTask
 
 
-assert importlib.metadata.version("ok-script") == "2.0.7b1"
+assert importlib.metadata.version("ok-script") == "2.0.8"
 assert cv2.__version__
 assert numpy.__version__
 assert openvino.__version__

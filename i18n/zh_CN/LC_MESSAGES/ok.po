@@ -1435,3 +1435,18 @@ msgstr "队伍已删除。"
 
 msgid "Send Email Report After Task"
 msgstr "任务完成后发送邮件汇报"
+
+msgid "Rover: Electro"
+msgstr "漂泊者·导电"
+
+msgid "JingRan"
+msgstr "景燃"
+
+msgid "Hsin"
+msgstr "心"
+
+msgid "Special Nightmare"
+msgstr "特异梦魇"
+
+msgid "Which Special Nightmare to Teleport"
+msgstr "传送到第几个特异梦魇"

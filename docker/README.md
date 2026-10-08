@@ -170,7 +170,7 @@ Docker `json-file` log at 10 MiB, retaining five files by default. Override
   used by this Dockerfile. Other architectures need a separate browser image.
 - The image pins the Linux runtime, including headless OpenCV, OCR and OpenVINO.
   Qt is deliberately absent because the runner uses ok-script's headless core.
-- `ok-script==2.0.7b1` incorrectly declares native Windows input/audio packages
+- `ok-script==2.0.8` incorrectly declares native Windows input/audio packages
   for every platform. During the image build, the exact upstream wheel is
   checked against a fixed SHA-256 and a copied wheel has only those unused
   dependency declarations removed. Two device-backend aggregate initializers

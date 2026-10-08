@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONPATH=/app/docker/linux_compat:/app \
     DISPLAY=:99
 
-ARG OK_SCRIPT_VERSION=2.0.7b1
+ARG OK_SCRIPT_VERSION=2.0.8
 ARG OK_WW_BUILD_VERSION=dev
 ARG OK_WW_BUILD_REVISION=unknown
 

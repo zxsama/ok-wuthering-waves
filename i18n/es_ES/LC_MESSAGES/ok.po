@@ -1313,3 +1313,15 @@ msgstr "Equipo eliminado."
 
 msgid "Send Email Report After Task"
 msgstr "Enviar informe por correo al finalizar la tarea"
+
+msgid "Rover: Electro"
+msgstr "Rover: Electro"
+
+msgid "JingRan"
+msgstr "Jingran"
+
+msgid "Special Nightmare"
+msgstr "Pesadilla especial"
+
+msgid "Which Special Nightmare to Teleport"
+msgstr "Pesadilla especial a la que teletransportar"

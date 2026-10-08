@@ -39,6 +39,37 @@ class TestHeadlessImports(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_multi_account_import_skips_native_login_api_on_linux(self):
+        script = textwrap.dedent(
+            """
+            import sys
+            import types
+            from importlib.abc import MetaPathFinder
+            import src.task.DailyTask
+
+            class BlockWin32(MetaPathFinder):
+                def find_spec(self, fullname, path=None, target=None):
+                    if fullname in {'win32con', 'win32gui', 'win32process'}:
+                        raise ModuleNotFoundError(f'blocked {fullname}')
+
+            mouse_reset = types.ModuleType('src.task.MouseResetTask')
+            mouse_reset.MouseResetTask = type('MouseResetTask', (), {})
+            sys.modules[mouse_reset.__name__] = mouse_reset
+            sys.platform = 'linux'
+            sys.meta_path.insert(0, BlockWin32())
+            from src.task.MultiAccountDailyTask import find_login_combo
+            assert find_login_combo(123) is None
+            """
+        )
+        result = subprocess.run(
+            [sys.executable, '-c', script],
+            cwd=Path(__file__).resolve().parents[1],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 class TestWWOneTimeTaskCompatibility(unittest.TestCase):
 

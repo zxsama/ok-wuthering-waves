@@ -58,7 +58,7 @@ def main() -> None:
         page.wait_for_timeout(500)
         schedule_text = body.inner_text()
         page.screenshot(path=ARTIFACT_DIR / "schedule.png", animations="disabled", timeout=10_000)
-        assert "DailyTask" in schedule_text
+        assert "📅 每日任务" in schedule_text
         page.get_by_role("button", name="创建任务", exact=True).click(timeout=5_000)
         page.wait_for_timeout(300)
         create_schedule_text = body.inner_text()
