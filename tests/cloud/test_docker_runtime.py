@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -45,6 +46,23 @@ def test_dockerfile_verifies_compatibility_wheel_and_runtime_imports():
     assert dockerfile.index("COPY docker/requirements-cloud.txt") < dockerfile.index(
         "COPY . /app"
     )
+
+
+def test_cloud_runtime_version_matches_project_dependencies():
+    version = patch_ok_script_wheel.EXPECTED_FILENAME.removeprefix(
+        "ok_script-"
+    ).removesuffix("-py3-none-any.whl")
+    project = tomllib.loads(_read("pyproject.toml"))["project"]
+
+    assert f"ok-script[ocr,qt]>={version}" in project["dependencies"]
+    assert f"ok-script[web]=={version}" in project["optional-dependencies"]["web-test"]
+    assert f"ok-script[ocr,qt]=={version}" in _read("requirements.txt").splitlines()
+    assert f"ARG OK_SCRIPT_VERSION={version}" in _read("docker/Dockerfile").splitlines()
+    assert f'importlib.metadata.version("ok-script") == "{version}"' in _read(
+        "docker/smoke_test.py"
+    )
+    assert patch_ok_script_wheel.METADATA_PATH == f"ok_script-{version}.dist-info/METADATA"
+    assert patch_ok_script_wheel.RECORD_PATH == f"ok_script-{version}.dist-info/RECORD"
 
 
 def test_default_container_task_runner_is_daily_task():
@@ -124,7 +142,9 @@ def test_compose_smoke_checks_container_updates_and_vnc_transport():
     assert "http://127.0.0.1:17880/api/updates" in smoke
     assert '"update_available":false' in smoke
     assert "http://127.0.0.1:17880/api/docker-update" in smoke
-    assert '"current_version":"v1.0.7"' in smoke
+    assert 'Path("/app/VERSION").read_text' in smoke
+    assert 'os.environ.get("OK_WW_BUILD_VERSION", "")' in smoke
+    assert 'update_status["current_version"] == expected_version' in smoke
     assert "ws://127.0.0.1:15980/websockify" in smoke
     assert "RFB 003.008" in smoke
     assert "SetProcessDpiAwareness error" in smoke
@@ -420,7 +440,7 @@ def test_compatibility_wheel_removes_only_declared_cloud_unused_dependencies(
         [
             b"Metadata-Version: 2.4\n",
             b"Name: ok-script\n",
-            b"Version: 2.0.8\n",
+            b"Version: 2.0.15b2\n",
             b"Requires-Dist: requests>=2.32.3\n",
             b"Requires-Dist: pywin32!=312,>=306\n",
             b"Requires-Dist: pydirectinput==1.0.4\n",

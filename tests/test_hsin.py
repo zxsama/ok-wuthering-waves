@@ -169,7 +169,7 @@ class HsinRotationTest(unittest.TestCase):
             check_health_bar=lambda: False, target_enemy_time_out=3,
             should_check_monthly_card=lambda: False)
 
-        def retarget(wait=True, time_out=None, check_health=False):
+        def retarget(wait=True, **kwargs):
             retargets.append(self.clock.now)
             self.clock.advance(3)
             return False

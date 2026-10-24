@@ -31,14 +31,17 @@ def install_daily_task_retry(task: Any) -> None:
             return "Daily Task Failure Retries must be a non-negative integer."
         return original_validate(key, value)
 
-    def check_stopped():
+    def check_stopped(active_task):
         if task.exit_is_set():
             raise FinishedException()
-        if not task.enabled:
+        if not active_task.enabled:
             raise TaskDisabledException()
 
     @wraps(original_run)
     def run(*args, **kwargs):
+        # Nested daily runs belong to the enabled parent task (for example,
+        # multi-account runs); the daily instance itself remains disabled.
+        active_task = getattr(getattr(task, "executor", None), "current_task", None) or task
         retries = task.config.get(RETRY_COUNT, DEFAULT_RETRY_COUNT)
         error = validate_config(RETRY_COUNT, retries)
         if error:
@@ -51,7 +54,7 @@ def install_daily_task_retry(task: Any) -> None:
             except Exception as exc:
                 if attempt == retries:
                     raise
-                check_stopped()
+                check_stopped(active_task)
                 task.log_warning(
                     f"Daily Task failed; retry {attempt + 1}/{retries} "
                     f"in {RETRY_DELAY_SECONDS} seconds: {exc}"
@@ -59,13 +62,13 @@ def install_daily_task_retry(task: Any) -> None:
                 # TaskExecutor.sleep normally captures frames and calls
                 # sleep_check. A transient capture/task failure must not
                 # interrupt this recovery delay. Keep its stop/pause handling.
-                sleep_check_interval = task.sleep_check_interval
-                task.sleep_check_interval = -1
+                sleep_check_interval = active_task.sleep_check_interval
+                active_task.sleep_check_interval = -1
                 try:
                     task.sleep(RETRY_DELAY_SECONDS)
                 finally:
-                    task.sleep_check_interval = sleep_check_interval
-                check_stopped()
+                    active_task.sleep_check_interval = sleep_check_interval
+                check_stopped(active_task)
 
     task.validate_config = validate_config
     task.run = run

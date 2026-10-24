@@ -50,8 +50,6 @@ curl -fsS http://127.0.0.1:17880/api/about \
     | grep -q '"update_supported":false'
 curl -fsS http://127.0.0.1:17880/api/updates \
     | grep -q '"update_available":false'
-curl -fsS http://127.0.0.1:17880/api/docker-update \
-    | grep -q '"current_version":"v1.0.7"'
 if curl -fsS -X POST http://127.0.0.1:17880/api/docker-update >/dev/null 2>&1; then
     echo 'Docker update endpoint accepted a request without confirmation' >&2
     exit 74
@@ -59,8 +57,21 @@ fi
 curl -fsS http://127.0.0.1:15980/vnc.html >/dev/null
 docker compose exec -T cloud-runner python - <<'PY'
 import asyncio
+import json
+import os
+from pathlib import Path
+from urllib.request import urlopen
 
 import websockets
+
+
+expected_version = os.environ.get("OK_WW_BUILD_VERSION", "").strip()
+if not expected_version or expected_version == "dev":
+    expected_version = Path("/app/VERSION").read_text(encoding="utf-8").strip()
+assert expected_version
+with urlopen("http://127.0.0.1:8765/api/docker-update", timeout=10) as response:
+    update_status = json.load(response)
+assert update_status["current_version"] == expected_version, update_status
 
 
 async def main():

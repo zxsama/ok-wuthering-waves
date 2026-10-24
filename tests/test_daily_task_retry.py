@@ -261,6 +261,44 @@ def test_real_executor_retry_delay_respects_pause(monkeypatch, pause_target):
     task.sleep_check.assert_not_called()
 
 
+@pytest.mark.parametrize("stop_during_wait", [False, True])
+def test_nested_daily_run_uses_parent_lifecycle(monkeypatch, stop_during_wait):
+    from src.task.MultiAccountDailyTask import MultiAccountDailyTask
+
+    task, original, executor, clock = make_executor_retry_task(monkeypatch)
+    task._enabled = False
+    parent = MultiAccountDailyTask(executor=executor, app=SimpleNamespace(tr=lambda text: text))
+    parent._enabled = True
+    parent.get_task_by_class = Mock(return_value=task)
+    parent.log_error = Mock()
+    parent.sleep_check = Mock(side_effect=RuntimeError("parent check must not run"))
+    parent.sleep_check_interval = 0.7
+    executor.current_task = parent
+    failure = RuntimeError("final daily failure")
+    original.side_effect = failure
+
+    def advance(seconds):
+        assert parent.sleep_check_interval == -1
+        assert task.sleep_check_interval == 0.4
+        clock.now += seconds
+        if stop_during_wait:
+            parent._enabled = False
+
+    executor._wait_for_activity.side_effect = advance
+
+    with pytest.raises(TaskDisabledException if stop_during_wait else RuntimeError) as caught:
+        parent.run_task_by_class(DailyTask)
+
+    assert original.call_count == (1 if stop_during_wait else 6)
+    if not stop_during_wait:
+        assert caught.value is failure
+    assert parent.sleep_check_interval == 0.7
+    assert task.sleep_check_interval == 0.4
+    assert task.enabled is False
+    executor.next_frame.assert_not_called()
+    parent.sleep_check.assert_not_called()
+
+
 def test_daily_task_installs_before_config_load_and_setting_survives_restart(tmp_path, monkeypatch):
     monkeypatch.setattr(Config, "config_folder", str(tmp_path))
     first = create_daily_task()

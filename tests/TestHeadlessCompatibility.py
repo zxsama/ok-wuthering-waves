@@ -26,6 +26,16 @@ class TestHeadlessImports(unittest.TestCase):
             sys.meta_path.insert(0, BlockWin32())
             import src.task.WWOneTimeTask
             import src.combat.CombatCheck
+            from unittest.mock import patch
+            sys.platform = 'linux'
+            from src.task.MultiAccountConfigTask import MultiAccountConfigTask
+            from src.task.MultiAccountDailyTask import MultiAccountDailyTask
+
+            task = MultiAccountConfigTask.__new__(MultiAccountConfigTask)
+            task._login_cursor_active = True
+            with patch.object(MultiAccountDailyTask, 'click', return_value=True) as click:
+                assert task.click(100, 200) is True
+                click.assert_called_once_with(100, 200)
             """
         )
 
