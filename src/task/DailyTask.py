@@ -2,6 +2,7 @@ import re
 
 
 from ok import Logger, TaskDisabledException
+from extensions.daily_task_retry import install_daily_task_retry
 from src.task.BaseWWTask import number_re
 from src.task.FarmEchoTask import FarmEchoTask
 from src.task.ForgeryTask import ForgeryTask
@@ -73,6 +74,7 @@ class DailyTask(WWOneTimeTask, BaseCombatTask):
         }
         self.add_exit_after_config()
         self.description = "Login, claim monthly card, farm echo, and claim daily reward"
+        install_daily_task_retry(self)
 
     def run(self):
         self.validate_additional_tasks()
