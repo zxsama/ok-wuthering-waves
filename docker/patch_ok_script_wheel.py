@@ -1,6 +1,6 @@
 """Create a Linux-installable copy of the pinned ok-script wheel.
 
-ok-script 2.0.15b2 is a pure-Python wheel, but its core metadata declares three
+ok-script 3.0.7 is a pure-Python wheel, but its core metadata declares three
 Windows-only runtime packages without platform markers.  The cloud bridge does
 not import those native backends.  This build-only tool verifies the exact
 upstream artifact and removes only those dependency declarations from a copied
@@ -18,10 +18,10 @@ import zipfile
 from pathlib import Path
 
 
-EXPECTED_FILENAME = "ok_script-2.0.15b2-py3-none-any.whl"
-EXPECTED_SHA256 = "f58e60d2fd6825ccf833c2ce7d290c0f93464c41224411ec9b9794ac6c03762c"
-METADATA_PATH = "ok_script-2.0.15b2.dist-info/METADATA"
-RECORD_PATH = "ok_script-2.0.15b2.dist-info/RECORD"
+EXPECTED_FILENAME = "ok_script-3.0.7-py3-none-any.whl"
+EXPECTED_SHA256 = "e61de3b3c48e21b6ae7eb882562211984a5537038578b4c28534e28e7de8d9a7"
+METADATA_PATH = "ok_script-3.0.7.dist-info/METADATA"
+RECORD_PATH = "ok_script-3.0.7.dist-info/RECORD"
 CAPTURE_INIT_PATH = "ok/device/capture_methods/__init__.py"
 CAPTURE_COMPAT_PATH = "ok/device/capture.py"
 INTERACTION_INIT_PATH = "ok/device/interaction_methods/__init__.py"

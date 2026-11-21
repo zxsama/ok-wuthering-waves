@@ -168,6 +168,7 @@ class HsinRotationTest(unittest.TestCase):
             has_target=lambda: not lost_before_hold and char.task.mouse_start is None,
             check_health_bar=lambda: False, target_enemy_time_out=3,
             should_check_monthly_card=lambda: False)
+        checker.is_browser = lambda: False
 
         def retarget(wait=True, **kwargs):
             retargets.append(self.clock.now)
@@ -510,8 +511,9 @@ class HsinRotationTest(unittest.TestCase):
 class HsinEnhancedTemplateTest(unittest.TestCase):
     @staticmethod
     def detector_task(frame):
-        feature_set = FeatureSet(False, 'assets/coco_annotations.json', 0.002, 0.002,
-                                 0.8, process_feature, hcenter_features=['e_forte'])
+        feature_set = FeatureSet(False, None, 0.002, 0.002,
+                                 0.8, process_feature, hcenter_features=['e_forte'],
+                                 template_folder='assets/templates')
         return SimpleNamespace(
             frame=frame,
             find_e_forte=lambda: feature_set.find_one_feature(
@@ -519,7 +521,7 @@ class HsinEnhancedTemplateTest(unittest.TestCase):
                 frame_processor=lambda image: binarize_for_matching(image, 220)))
 
     def test_existing_prompt_controls_readiness_without_marking_cast_success(self):
-        frame = cv2.imread('assets/images/31.png')
+        frame = cv2.imread('ok_templates/xigelika.png')
         self.assertIsNotNone(frame)
         task = self.detector_task(frame)
         self.assertTrue(task.find_e_forte())

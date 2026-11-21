@@ -764,8 +764,8 @@ def create_cloud_web_app(
         from config import config as project_config
         from fastapi import Header, HTTPException
         from ok.core.events import communicate
-        from ok.ui.web import app as ok_web_app_module
-        from ok.ui.web.app import create_web_app
+        from .management_web import app as ok_web_app_module
+        from .management_web.app import create_web_app
         from starlette.responses import HTMLResponse
     except ImportError as exc:
         raise CloudConfigurationError(

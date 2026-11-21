@@ -6,7 +6,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from ok import WebCustomTab, WebTabConfig, task_tab_action, task_tab_query
+from .management_web.task_tabs import WebCustomTab, WebTabConfig, task_tab_action, task_tab_query
 from PIL import Image
 
 from src.char.CharFactory import apply_team_char_classes, char_dict

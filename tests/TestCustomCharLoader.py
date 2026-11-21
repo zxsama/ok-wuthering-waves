@@ -3,7 +3,8 @@ import unittest
 import zipfile
 import json
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from ok.util.config import Config
 from src.Labels import Labels
@@ -24,6 +25,7 @@ from src.char.CustomCharLoader import (
 )
 from src.char.Mortefi import Mortefi
 from src.char.Verina import Verina
+from src.task.BaseCombatTask import BaseCombatTask
 
 
 class TestCustomCharLoader(unittest.TestCase):
@@ -157,6 +159,32 @@ class Mortefi(BuiltinMortefi):
         self.assertEqual(first_task.chars[0].team_marker, "first")
         self.assertEqual(second_task.chars[0].team_marker, "second")
         self.assertIsNot(type(first_task.chars[0]), type(second_task.chars[0]))
+
+    def test_combat_load_applies_saved_team_code_after_restart(self):
+        team = (Mortefi, Chixia, Verina)
+        create_custom_team(team)
+        save_team_char_code(team, Mortefi, self._team_code("saved-team"))
+        clear_team_char_cache()
+        task = SimpleNamespace(
+            chars=[None, None, None],
+            load_hotkey=Mock(),
+            in_team=Mock(return_value=(True, 0, 3)),
+            get_box_by_name=Mock(),
+            _char_identity=BaseCombatTask._char_identity,
+            _app=None,
+            info_set=Mock(),
+            log_info=Mock(),
+            tr=lambda text: text,
+        )
+        detected = self._chars(task, Verina)
+
+        with patch('src.task.BaseCombatTask.get_char_by_pos', side_effect=detected):
+            self.assertTrue(BaseCombatTask.load_chars(task))
+
+        self.assertEqual(task.chars[0].team_marker, "saved-team")
+        self.assertTrue(task.chars[0].is_current_char)
+        self.assertFalse(task.chars[1].is_current_char)
+        self.assertFalse(task.chars[2].is_current_char)
 
     def test_list_custom_teams_skips_unreadable_team_folder(self):
         valid_team = (Mortefi, Chixia, Verina)

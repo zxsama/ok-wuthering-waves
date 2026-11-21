@@ -29,8 +29,8 @@ def test_linux_runtime_dependencies_are_pinned_and_headless():
     assert package_lines
     assert all("==" in line for line in package_lines)
     assert "opencv-python-headless==5.0.0.93" in package_lines
-    assert "onnxocr-ppocrv5==0.0.22" in package_lines
-    assert "openvino==2026.3.0" in package_lines
+    assert "onnxocr-ppocrv6[openvino]==0.0.1" in package_lines
+    assert "openvino==2026.4.1" in package_lines
     assert not any("pyside" in line.lower() for line in package_lines)
     assert not any(line.startswith("opencv-python==") for line in package_lines)
 
@@ -54,8 +54,9 @@ def test_cloud_runtime_version_matches_project_dependencies():
     ).removesuffix("-py3-none-any.whl")
     project = tomllib.loads(_read("pyproject.toml"))["project"]
 
-    assert f"ok-script[ocr,qt]>={version}" in project["dependencies"]
-    assert f"ok-script[web]=={version}" in project["optional-dependencies"]["web-test"]
+    assert f"ok-script[ocr,qt]=={version}" in project["dependencies"]
+    assert "fastapi==0.141.1" in project["optional-dependencies"]["web-test"]
+    assert "uvicorn[standard]==0.52.4" in project["optional-dependencies"]["web-test"]
     assert f"ok-script[ocr,qt]=={version}" in _read("requirements.txt").splitlines()
     assert f"ARG OK_SCRIPT_VERSION={version}" in _read("docker/Dockerfile").splitlines()
     assert f'importlib.metadata.version("ok-script") == "{version}"' in _read(
@@ -440,7 +441,7 @@ def test_compatibility_wheel_removes_only_declared_cloud_unused_dependencies(
         [
             b"Metadata-Version: 2.4\n",
             b"Name: ok-script\n",
-            b"Version: 2.0.15b2\n",
+            b"Version: 3.0.7\n",
             b"Requires-Dist: requests>=2.32.3\n",
             b"Requires-Dist: pywin32!=312,>=306\n",
             b"Requires-Dist: pydirectinput==1.0.4\n",

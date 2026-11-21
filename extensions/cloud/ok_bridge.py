@@ -289,6 +289,17 @@ def create_cloud_ok_class(manager: CloudDeviceManager) -> type:
 
     class CloudOK(OK):
         def __init__(self, config: dict[str, Any]) -> None:
+            if config.get("web_runtime"):
+                from .management_web.task_tabs import configured_web_custom_tabs
+
+                config = dict(config)
+                tasks = list(config.get("onetime_tasks", []))
+                existing = {tuple(task[:2]) for task in tasks}
+                for tab in configured_web_custom_tabs(config.get("web_tabs", [])):
+                    if tuple(tab) not in existing:
+                        tasks.append(tab)
+                        existing.add(tuple(tab))
+                config["onetime_tasks"] = tasks
             # OK keeps these as class attributes by default.  Per-run values
             # prevent a completed scheduled invocation leaking its set event.
             self.exit_event = ExitEvent()

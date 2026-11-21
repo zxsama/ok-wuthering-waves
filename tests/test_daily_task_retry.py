@@ -165,6 +165,11 @@ def make_executor_retry_task(monkeypatch):
     executor_module = importlib.import_module("ok.task.TaskExecutor")
     monkeypatch.setattr(executor_module, "time", SimpleNamespace(time=lambda: clock.now))
     executor = TaskExecutor.__new__(TaskExecutor)
+    # Retry sleeps execute on the worker thread; preserve the real lifecycle
+    # checks added by the executor job API without starting a background worker.
+    executor.thread = threading.current_thread()
+    executor.current_job = None
+    executor._exclusive_owner = None
     executor.scene = None
     executor.text_fix = {}
     executor.exit_event = threading.Event()

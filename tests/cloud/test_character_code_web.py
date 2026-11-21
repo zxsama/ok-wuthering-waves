@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from ok.task.web import call_task_tab_operation, task_tab_operations
+from extensions.cloud.management_web.task_tabs import call_task_tab_operation, task_tab_operations
 from ok.util.config import Config
 
 from extensions.cloud.character_code_task import CloudCharacterCodeTask

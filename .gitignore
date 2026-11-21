@@ -1,6 +1,7 @@
 .venv
 onnxocr/
 ok_tasks/
+ok_import/
 updates/
 working/
 update/
@@ -19,6 +20,7 @@ fonts
 .idea/
 __pycache__/
 issue*.json
+/.pr-reviews/
 *.py[cod]
 *$py.class
 # Local account configuration and execution history (may contain private data).
@@ -82,4 +84,3 @@ working_images/
 repo/
 
 assets/result.json
-src/gui/CharacterCodeTab.py

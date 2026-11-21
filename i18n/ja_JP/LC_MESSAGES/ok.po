@@ -723,7 +723,7 @@ msgid "Use Liberation"
 msgstr ""
 
 msgid "Daily"
-msgstr ""
+msgstr "デイリー"
 
 msgid "Dungeon"
 msgstr ""
@@ -805,133 +805,23 @@ msgstr "テレポートするボスチャレンジ"
 msgid "From Top to Bottom, Starting with 1"
 msgstr "上から下へ、1から開始"
 
-msgid "Characters"
-msgstr "キャラクター"
-
-msgid "Character Code"
-msgstr "キャラクターコード"
-
-msgid "Use built in"
-msgstr "内蔵を使用"
-
-msgid "Use custom"
-msgstr "カスタムを使用"
-
-msgid "Ask AI"
-msgstr "AIに相談"
-
-msgid "How To"
-msgstr "使い方"
-
 msgid "Save"
 msgstr "保存"
-
-msgid "Custom code saved"
-msgstr "カスタムコードを保存しました"
-
-msgid "Unsaved changes"
-msgstr "未保存の変更"
-
-msgid "Unsaved Changes"
-msgstr "未保存の変更"
-
-msgid "Discard unsaved character code changes?"
-msgstr "未保存のキャラクターコードの変更を破棄しますか？"
-
-msgid "Saved and reloaded"
-msgstr "保存して再読み込みしました"
-
-msgid "Custom character code saved and reloaded."
-msgstr "カスタムキャラクターコードを保存して再読み込みしました。"
-
-msgid "Custom character code saved and reloaded for loaded characters."
-msgstr "読み込み済みのキャラクターにカスタムコードを保存して再読み込みしました。"
 
 msgid "Success"
 msgstr "成功"
 
-msgid "Using built in code"
-msgstr "内蔵コードを使用中"
-
-msgid "Built in character code selected."
-msgstr "内蔵キャラクターコードを選択しました。"
-
 msgid "Error"
 msgstr "エラー"
-
-msgid "Ask AI template copied. Paste it into an AI chatbot."
-msgstr "AI用テンプレートをコピーしました。AIチャットボットに貼り付けてください。"
-
-msgid "Copied"
-msgstr "コピー済み"
-
-msgid ""
-"Choose Use custom to edit a character's Python code. Use built-in mode to read and select the original code.\n"
-"\n"
-"Ask AI copies a prompt to the clipboard with the full current code at the top. Paste it into an AI chatbot, describe the change after 'I want to implement:', and ask it to return the full modified code.\n"
-"\n"
-"Paste the returned code back into this editor, review the highlighted changed lines, then click Save to apply changes."
-msgstr ""
-"カスタムを使用を選ぶと、キャラクターの Python コードを編集できます。内蔵モードでは元のコードを読み取り、選択できます。\n"
-"\n"
-"AIに相談は、現在の完全なコードを先頭に含むプロンプトをクリップボードにコピーします。AIチャットボットに貼り付け、'I want to implement:' の後に変更内容を書き、完全な修正済みコードを返すよう依頼してください。\n"
-"\n"
-"返されたコードをこのエディターに貼り付け、ハイライトされた変更行を確認してから、保存をクリックして変更を適用します。"
-
-msgid "How To Modify Character Code"
-msgstr "キャラクターコードの変更方法"
 
 msgid "Reset"
 msgstr "リセット"
 
-msgid "Reset Custom Code"
-msgstr "カスタムコードをリセット"
-
-msgid "Reset this character to built in code and remove the custom code?"
-msgstr "このキャラクターを内蔵コードに戻し、カスタムコードを削除しますか？"
-
-msgid ""
-"Custom code matches built in code. Removed custom code and switched to built"
-" in."
-msgstr "カスタムコードは内蔵コードと同じです。カスタムコードを削除し、内蔵に切り替えました。"
-
-msgid ""
-"Custom code matches built in code. Removed custom code, switched to built "
-"in, and reloaded loaded characters."
-msgstr "カスタムコードは内蔵コードと同じです。削除し、内蔵に切り替え、読み込み済みキャラクターを再読み込みしました。"
-
-msgid "Custom code reset to built in code."
-msgstr "カスタムコードを内蔵コードにリセットしました。"
-
-msgid "Custom code reset to built in code and reloaded for loaded characters."
-msgstr "カスタムコードを内蔵コードにリセットし、読み込み済みキャラクターに再読み込みしました。"
-
-msgid "Contribute Code"
-msgstr "コードを貢献"
-
-msgid "I want to implement:"
-msgstr "実装したい内容:"
-
-msgid "Please modify the full {class_name} character automation code above."
-msgstr "上記の {class_name} キャラクター自動化コード全体を修正してください。"
-
-msgid ""
-"Return only the complete modified Python code for the whole file, not a "
-"patch and not an explanation."
-msgstr "パッチや説明ではなく、ファイル全体の完全な修正済み Python コードのみを返してください。"
-
-msgid ""
-"Keep the class name as {class_name}. Preserve imports that are still needed."
-msgstr "クラス名は {class_name} のままにしてください。必要な import は残してください。"
-
-msgid ""
-"Use this BaseChar reference while reasoning about helper methods, task APIs,"
-" state, switching, cooldowns, and combat flow:"
-msgstr ""
-"ヘルパーメソッド、タスク API、状態、切り替え、クールダウン、戦闘フローを検討する際は、この BaseChar リファレンスを使用してください:"
-
 msgid "Rover: Spectro"
 msgstr "漂泊者・回折"
+
+msgid "Rover: Electro"
+msgstr "漂泊者・電導"
 
 msgid "Rover: Havoc"
 msgstr "漂泊者・消滅"
@@ -1116,8 +1006,8 @@ msgid "Merge Discarded Echoes"
 msgstr "破棄済み音骸を融合"
 
 msgid ""
-"Must have 1000 discarded Echo to Run, Merge discarded Echoes in full "
-"batches of 100."
+"Must have 1000 discarded Echo to Run, Merge discarded Echoes in full batches"
+" of 100."
 msgstr "実行には破棄済み音骸が1000個必要です。破棄済み音骸を100個単位で融合します。"
 
 msgid "Bag Key"
@@ -1144,13 +1034,18 @@ msgstr "破棄済み音骸が1000個超なら融合"
 msgid "Additional Tasks to Run After Daily Task"
 msgstr "デイリータスク後に実行する追加タスク"
 
-msgid "Select optional tasks. Nightmare Nest runs before stamina farming to help complete the daily task; the other tasks run afterward."
-msgstr "任意のタスクを選択します。悪夢の巣はデイリー達成を補助するためスタミナ消費前に実行し、その他のタスクはその後に実行します。"
+msgid ""
+"Nightmare Nest runs after stamina farming. If Tacet Suppression yielded "
+"rewards, daily rewards are claimed before Nightmare Nest."
+msgstr "悪夢の巣はスタミナを消費した後に実行します。無音区で報酬を獲得した場合は、悪夢の巣に入る前にデイリー報酬を受け取ります。"
 
-msgid "Teleport and Farm 4C Echo requires \"Teleport to Boss\" to be enabled in Farm Echo Task."
+msgid ""
+"Teleport and Farm 4C Echo requires \"Teleport to Boss\" to be enabled in "
+"Farm Echo Task."
 msgstr "「テレポートしてコスト4音骸を収集」を実行するには、音骸収集タスクの「ボスへテレポート」を有効にしてください。"
 
-msgid "Auto Farm all Nightmare Nest requires at least one \"Which to Farm\" option."
+msgid ""
+"Auto Farm all Nightmare Nest requires at least one \"Which to Farm\" option."
 msgstr "「すべての悪夢の巣を自動周回」を実行するには、「周回対象」を1つ以上選択してください。"
 
 msgid "Daily Task Completed"
@@ -1232,16 +1127,829 @@ msgid "点击B进入背包, 在过滤器中选择需要强化的声骸, 并按�
 msgstr "Bキーでバッグを開き、フィルターで強化する音骸を選択し、レベル0から昇順に並べて開始してください。"
 
 msgid "游戏与okww语言必须为简体/繁体中文,必须16:9分辨率,使用1600x900以上分辨率, 勾选需要的, 没勾的都会自动合成"
-msgstr "ゲームとokwwの言語は簡体字/繁体字中国語、解像度は16:9かつ1600x900以上が必要です。必要なものにチェックを入れると、未チェックのものは自動合成されます。"
+msgstr ""
+"ゲームとokwwの言語は簡体字/繁体字中国語、解像度は16:9かつ1600x900以上が必要です。必要なものにチェックを入れると、未チェックのものは自動合成されます。"
 
 msgid "Switch to Healer before and after Combat"
 msgstr "戦闘前後にヒーラーへ切り替える"
 
-msgid "All fields are required."
-msgstr "すべての項目を入力してください。"
-
 msgid "Author"
 msgstr "作者"
+
+msgid "Description"
+msgstr "説明"
+
+msgid "Export"
+msgstr "エクスポート"
+
+msgid "No shared code is available for this team."
+msgstr "このチームで共有されているコードはありません。"
+
+msgid "Size"
+msgstr "サイズ"
+
+msgid "Version"
+msgstr "バージョン"
+
+msgid "Cancel"
+msgstr "キャンセル"
+
+msgid "Close"
+msgstr "閉じる"
+
+msgid "JingRan"
+msgstr "景燃"
+
+msgid "Multi Account Config Task"
+msgstr "複数アカウント設定タスク"
+
+msgid ""
+"Log in to accounts in card order and run tasks with independent "
+"configurations"
+msgstr "カードの順番でアカウントにログインし、個別の設定でタスクを実行します"
+
+msgid "Special Nightmare"
+msgstr "特異悪夢"
+
+msgid "Which Special Nightmare to Teleport"
+msgstr "テレポートする特異悪夢"
+
+msgid "Failed to read game assets quality config. Starting with HD assets."
+msgstr "ゲームアセットの品質設定を読み取れませんでした。HDアセットで起動します。"
+
+msgid "Roccia C6"
+msgstr "ロココ 6凸（メインアタッカー）"
+
+#, python-brace-format
+msgid "could not find char {index} {info} {highest_confidence}"
+msgstr "キャラクターを認識できません: {index} {info} {highest_confidence}"
+
+msgid "can not open wheel"
+msgstr "ツールホイールを開けません"
+
+msgid "on_combat_check failed"
+msgstr "戦闘状態の確認に失敗しました"
+
+#, python-brace-format
+msgid "enter combat {has_lavitator}"
+msgstr "戦闘開始、浮遊状態: {has_lavitator}"
+
+msgid "Target enemy failed, please disable Nvidia/AMD Filter or Sharpening!"
+msgstr "敵のロックオンに失敗しました。Nvidia/AMD のフィルターやシャープ化を無効にしてください！"
+
+msgid "Characters dead"
+msgstr "キャラクターが戦闘不能になりました"
+
+msgid "click m to open the map"
+msgstr "M キーでマップを開きます"
+
+msgid "Abyss start prompt disappeared, force enter combat"
+msgstr "深淵の開始表示が消えたため、戦闘を開始します"
+
+msgid "Can not find a teleport to heal"
+msgstr "回復用の転送ポイントが見つかりません"
+
+msgid "Can not find the travel button"
+msgstr "ファストトラベルボタンが見つかりません"
+
+msgid "raise_not_in_combat char dead"
+msgstr "キャラクターが戦闘不能のため、戦闘を終了します"
+
+msgid "wait condition failed while walking"
+msgstr "移動中の待機条件を満たせませんでした"
+
+#, python-brace-format
+msgid "set_key {key} to {name}"
+msgstr "キー {key} を {name} として認識しました"
+
+msgid "Could not reach the Abyss challenge start"
+msgstr "深淵チャレンジの開始地点に到達できません"
+
+msgid "Could not load the Abyss team"
+msgstr "深淵のチームを読み込めません"
+
+#, python-brace-format
+msgid "loaded chars success {c} {confidence}"
+msgstr "キャラクターを読み込みました: {c}、信頼度: {confidence}"
+
+msgid "start walk_to_treasure"
+msgstr "報酬へ移動します"
+
+#, python-brace-format
+msgid "angle: {my_angle}, to_turn: {to_turn}"
+msgstr "現在の角度: {my_angle}、回転量: {to_turn}"
+
+#, python-brace-format
+msgid "open_boss_book {name}"
+msgstr "残像探しを開きます: {name}"
+
+#, python-brace-format
+msgid "click {book_key} to open the book"
+msgstr "{book_key} キーでガイドブックを開きます"
+
+msgid "zoom map to max"
+msgstr "マップを最大まで拡大します"
+
+#, python-brace-format
+msgid "Can not find {feature} on minimap"
+msgstr "ミニマップに {feature} が見つかりません"
+
+#, python-brace-format
+msgid "changed direction {angle} {current_direction} -> {new_direction}"
+msgstr "方向転換 {angle}: {current_direction} -> {new_direction}"
+
+msgid "monthly_card found click"
+msgstr "月パス報酬を検出したため、受け取ります"
+
+#, python-brace-format
+msgid "send {book_key} key to open"
+msgstr "{book_key} キーで開きます"
+
+msgid "send f2 key mouse key to open the book"
+msgstr "F2 キーとマウス操作でガイドブックを開きます"
+
+msgid "can't find boss_proceed"
+msgstr "チャレンジへ進むボタンが見つかりません"
+
+msgid "find_function not found, change to opposite direction"
+msgstr "操作表示が見つからないため、反対方向へ移動します"
+
+msgid "cant find the f to enter"
+msgstr "入場用の F 操作表示が見つかりません"
+
+msgid "can not walk to treasure!"
+msgstr "報酬まで移動できません！"
+
+#, python-brace-format
+msgid "yolo found echo {echos}"
+msgstr "YOLO が音骸を検出しました: {echos}"
+
+msgid "Close the notice!"
+msgstr "お知らせを閉じます！"
+
+msgid "Game update completed; the game will restart"
+msgstr "ゲームの更新が完了しました。再起動します"
+
+#, python-brace-format
+msgid "start_device end {result}"
+msgstr "デバイスの起動が完了しました: {result}"
+
+msgid "must be in game world and in teams"
+msgstr "ゲームのオープンワールドでチームを編成してください"
+
+msgid "not on the wall, stop running"
+msgstr "壁から離れたため、走るのを止めます"
+
+msgid "on the wall, start running"
+msgstr "壁にいるため、走り始めます"
+
+msgid "Click the Agree button!"
+msgstr "同意ボタンを押します！"
+
+#, python-brace-format
+msgid "Click Start Game! {start}"
+msgstr "ゲーム開始を押します！ {start}"
+
+#, python-brace-format
+msgid "wait_login {switch_login} {boxes}"
+msgstr "ログインを待機中: {switch_login} {boxes}"
+
+msgid "can't find boss_proceed after scroll"
+msgstr "スクロール後もチャレンジへ進むボタンが見つかりません"
+
+msgid "Click the Login button!"
+msgstr "ログインボタンを押します！"
+
+#, python-brace-format
+msgid "unknown_lang {name}"
+msgstr "未対応の言語: {name}"
+
+msgid "Start after filtering Echoes on the bag's Echo screen!"
+msgstr "バッグの音骸画面で絞り込んでから開始してください！"
+
+#, python-brace-format
+msgid ""
+"No more Echoes to modify. Finished! Enhanced: {total}, matching: {matching}"
+msgstr "変更できる音骸がありません。完了！強化: {total}、条件一致: {matching}"
+
+msgid "Cannot find the current main stat!"
+msgstr "現在のメインステータスが見つかりません！"
+
+msgid "The target stat matches the current stat. Change the Echo filter!"
+msgstr "目標と現在のステータスが同じです。音骸の絞り込み条件を変更してください！"
+
+#, python-brace-format
+msgid "Cannot open screenshot folder: {e}"
+msgstr "スクリーンショットフォルダーを開けません: {e}"
+
+msgid "check weekly garden"
+msgstr "週間の楽園タスクを確認します"
+
+msgid "check discarded echo"
+msgstr "破棄対象の音骸を確認します"
+
+msgid "battle pass"
+msgstr "先駆ラジオの報酬を受け取ります"
+
+msgid "open_daily"
+msgstr "デイリー任務を開きます"
+
+msgid "claim daily reward via  coordinate"
+msgstr "座標指定でデイリー報酬を受け取ります"
+
+msgid "weekly garden not completed, run GardenTask"
+msgstr "週間の楽園タスクが未完了のため、実行します"
+
+msgid "can not battle pass, maybe ended"
+msgstr "先駆ラジオの報酬を受け取れません。終了した可能性があります"
+
+msgid "no_boss_proceed, click claim"
+msgstr "移動ボタンがないため、受け取りを押します"
+
+msgid "weekly garden already completed"
+msgstr "週間の楽園タスクは完了済みです"
+
+msgid "GardenTask Failed"
+msgstr "楽園タスクに失敗しました"
+
+msgid "MergeEchoTask Failed"
+msgstr "音骸合成タスクに失敗しました"
+
+msgid "NightmareNestTask Failed"
+msgstr "ナイトメアの巣タスクに失敗しました"
+
+msgid "farm_domain: death recovered, re-enter from F2 book"
+msgstr "素材周回: 復活したため、F2 のガイドブックから入り直します"
+
+msgid "\"self.stamina_once\" must be override"
+msgstr "self.stamina_once をオーバーライドする必要があります"
+
+#, python-brace-format
+msgid ""
+"farm_domain: exceeded recovery retries ({max_recovery_retries}), stop "
+"farming"
+msgstr "素材周回: 復帰の再試行上限（{max_recovery_retries}）を超えたため、停止します"
+
+msgid "farm_in_domain: death recovered, exiting domain"
+msgstr "秘境内周回: 復活したため、秘境から退出します"
+
+msgid "Does not meet the requirements; discarding"
+msgstr "条件を満たさないため、破棄します"
+
+msgid "Succeeded and locked"
+msgstr "成功し、ロックしました"
+
+msgid "The first substat must be valid; discarding"
+msgstr "最初のサブステータスが有効でないため、破棄します"
+
+msgid "Not enough remaining slots for the required valid substats; discarding"
+msgstr "残り枠では必要な有効サブステータス数に届かないため、破棄します"
+
+msgid "Failed to discard!"
+msgstr "破棄に失敗しました！"
+
+msgid "Failed to lock!"
+msgstr "ロックに失敗しました！"
+
+msgid "Matching Echo found; task paused"
+msgstr "条件に合う音骸が見つかったため、タスクを一時停止しました"
+
+#, python-brace-format
+msgid ""
+"No more Echoes to enhance. Finished! Enhanced: {total}, matching: {matching}"
+msgstr "強化できる音骸がありません。完了！強化: {total}、条件一致: {matching}"
+
+#, python-brace-format
+msgid "ocr values: {texts}"
+msgstr "OCR 認識結果: {texts}"
+
+#, python-brace-format
+msgid ""
+"Cannot obtain both CRIT stats ({missing_crit} missing, {remaining_slots} "
+"slots left); discarding"
+msgstr "クリティカル2種を揃えられません（不足: {missing_crit}、残り枠: {remaining_slots}）。破棄します"
+
+#, python-brace-format
+msgid "Combined CRIT score {total_score:.1f} < {minimum}; discarding"
+msgstr "クリティカル合計 {total_score:.1f} < {minimum} のため、破棄します"
+
+msgid "Cannot determine the Echo's discard state!"
+msgstr "音骸の破棄状態を確認できません！"
+
+msgid "Discarded successfully!"
+msgstr "破棄しました！"
+
+msgid "Cannot determine the Echo's lock state!"
+msgstr "音骸のロック状態を確認できません！"
+
+msgid "Locked successfully!"
+msgstr "ロックしました！"
+
+msgid "Enable staged material insertion in enhancement settings!"
+msgstr "強化設定で段階的な素材投入を有効にしてください！"
+
+msgid "Enable simultaneous tuning in enhancement settings!"
+msgstr "強化設定で同時チューニングを有効にしてください！"
+
+msgid "Cannot find Enhance and Tune!"
+msgstr "強化＆チューニングが見つかりません！"
+
+#, python-brace-format
+msgid "Invalid substat {p} before both CRIT stats; discarding"
+msgstr "クリティカル2種が揃う前に無効なサブステータス {p} が出たため、破棄します"
+
+#, python-brace-format
+msgid "First CRIT Rate {v} < {minimum}; discarding"
+msgstr "最初のクリティカル率 {v} < {minimum} のため、破棄します"
+
+#, python-brace-format
+msgid "First CRIT DMG {v} < {minimum}; discarding"
+msgstr "最初のクリティカルダメージ {v} < {minimum} のため、破棄します"
+
+#, python-brace-format
+msgid "in_realm: {_in_realm}"
+msgstr "秘境内: {_in_realm}"
+
+#, python-brace-format
+msgid "teleport_to_boss prepared as {walk_result}"
+msgstr "ボス転送の準備結果: {walk_result}"
+
+msgid "walk after boss teleport until combat or F"
+msgstr "ボス転送後、戦闘開始または F 表示まで移動します"
+
+msgid "Teleport to boss failed"
+msgstr "ボスへの転送に失敗しました"
+
+msgid "Teleport to boss failed: can not walk to combat or F"
+msgstr "ボス転送に失敗: 戦闘に入れず、F 表示も見つかりません"
+
+msgid "_has_treasure = True"
+msgstr "受け取り可能な報酬を検出しました"
+
+#, python-brace-format
+msgid "profile: {boss} {settings}"
+msgstr "ボス設定: {boss} {settings}"
+
+#, python-brace-format
+msgid "teleport_to_nearest_boss {box}"
+msgstr "最寄りのボスへ転送します: {box}"
+
+msgid "Teleport to boss failed: can not find F before entering realm"
+msgstr "ボス転送に失敗: 秘境入場前に F 表示が見つかりません"
+
+#, python-brace-format
+msgid "Can not find boss level {boss_level}"
+msgstr "ボスのレベル {boss_level} が見つかりません"
+
+#, python-brace-format
+msgid "teleport_to_nearest_boss {aim_boss}"
+msgstr "最寄りのボスへ転送します: {aim_boss}"
+
+msgid "Can not find the boss octagon on map"
+msgstr "マップにボスの八角形マーカーが見つかりません"
+
+msgid "scroll_and_click_buttons"
+msgstr "スクロールしてボタンを押します"
+
+msgid "start wait in combat"
+msgstr "戦闘の待機を開始します"
+
+#, python-brace-format
+msgid "combat_wait_time: {combat_wait_time}"
+msgstr "戦闘待機時間: {combat_wait_time}"
+
+#, python-brace-format
+msgid "Night elapsed: {night_elapsed:.1f}s"
+msgstr "夜間の経過時間: {night_elapsed:.1f}秒"
+
+msgid "boss not found"
+msgstr "ボスが見つかりません"
+
+msgid "farm 4c: death recovered, teleport to boss again"
+msgstr "コスト4音骸周回: 復活したため、ボスへ再転送します"
+
+#, python-brace-format
+msgid "Unknown Teleport to Boss config: {teleport_to_boss}"
+msgstr "不明なボス転送設定: {teleport_to_boss}"
+
+#, python-brace-format
+msgid ""
+"farm 4c: exceeded recovery retries ({max_recovery_retries}), stop farming"
+msgstr "コスト4音骸周回: 復帰の再試行上限（{max_recovery_retries}）を超えたため、停止します"
+
+msgid "Farm failed after walking into boss combat, teleporting again"
+msgstr "ボス戦闘開始後に周回に失敗したため、再転送します"
+
+msgid "Fenrico teleport_to_nearest_boss failed"
+msgstr "フェンリコの最寄りボス転送に失敗しました"
+
+msgid "not in combat try click restart"
+msgstr "戦闘中でないため、再挑戦を押します"
+
+#, python-brace-format
+msgid "Loaded {loaded} from {total} Stars"
+msgstr "{total} 個の星マーカーから {loaded} 個を読み込みました"
+
+msgid "can not find my cords on big map!"
+msgstr "全体マップで現在位置を確認できません！"
+
+msgid "cannot find any stars, stop farming"
+msgstr "星マーカーが見つからないため、周回を停止します"
+
+#, python-brace-format
+msgid "reached star {star} {distance} {star_move_distance_threshold}"
+msgstr "星マーカー {star} に到達、距離: {distance}、閾値: {star_move_distance_threshold}"
+
+msgid "too far from next star, stop farming"
+msgstr "次の星マーカーが遠すぎるため、周回を停止します"
+
+msgid "Starting task"
+msgstr "タスクを開始します"
+
+msgid "On the main screen"
+msgstr "メイン画面です"
+
+msgid "Five-to-one merge completed!"
+msgstr "5個合成が完了しました！"
+
+#, python-brace-format
+msgid "keeps: {count} set_name: {set_name} keep: {keeps}"
+msgstr "保持数: {count}、セット: {set_name}、保持対象: {keeps}"
+
+msgid "Keep all; skipping"
+msgstr "すべて保持するため、スキップします"
+
+msgid "ATK% not selected; skipping step two"
+msgstr "攻撃力％が未選択のため、手順2をスキップします"
+
+#, python-brace-format
+msgid "Failed to recognize stat list! {choices}"
+msgstr "ステータス一覧を認識できません！ {choices}"
+
+#, python-brace-format
+msgid "Fewer than 5 Echoes in {set_name}"
+msgstr "{set_name} の音骸が5個未満です"
+
+#, python-brace-format
+msgid "Not in configuration: {set_name} {name}; selecting for merge!"
+msgstr "設定にない {set_name} {name} を合成対象にします！"
+
+#, python-brace-format
+msgid "Index out of range, max is {total_number}"
+msgstr "インデックスが範囲外です。最大値: {total_number}"
+
+msgid "Garden task completed; limit reached"
+msgstr "楽園タスク完了、上限に達しました"
+
+#, python-brace-format
+msgid "Garden current: {current}"
+msgstr "現在の楽園進捗: {current}"
+
+#, python-brace-format
+msgid "click {name} {confidence:.3f}"
+msgstr "{name} をクリック、信頼度: {confidence:.3f}"
+
+msgid "click garden_get_confirm"
+msgstr "楽園報酬の確認ボタンを押します"
+
+#, python-brace-format
+msgid "can not open bag with hotkey {hotkey}"
+msgstr "キー {hotkey} でバッグを開けません"
+
+msgid "All full batches of discarded Echoes have been merged."
+msgstr "破棄対象の音骸を全バッチ合成しました。"
+
+msgid "Must have 1000 discarded Echo to Run"
+msgstr "実行には破棄対象の音骸が1000個以上必要です"
+
+msgid "Add accounts and save the configuration first."
+msgstr "先にアカウントを追加して設定を保存してください。"
+
+#, python-brace-format
+msgid "ComboBox account switch failed; falling back to OCR: {error_type}"
+msgstr "コンボボックスでの切替に失敗したため、OCR に切り替えます: {error_type}"
+
+#, python-brace-format
+msgid "Account confirmation mismatch; retrying {attempt}/5"
+msgstr "アカウント確認が一致しません。再試行 {attempt}/5"
+
+#, python-brace-format
+msgid "Cannot confirm target account {account}; stopping login."
+msgstr "対象アカウント {account} を確認できないため、ログインを停止します。"
+
+#, python-brace-format
+msgid "{account} logged in successfully"
+msgstr "{account} のログインに成功しました"
+
+#, python-brace-format
+msgid "Failed to save account run history: {error}"
+msgstr "アカウントの実行履歴を保存できません: {error}"
+
+#, python-brace-format
+msgid "Account {account} not found in the login list"
+msgstr "ログイン一覧にアカウント {account} が見つかりません"
+
+msgid "ComboBox account selection had no effect."
+msgstr "コンボボックスのアカウント選択が反映されませんでした。"
+
+msgid "Current ComboBox account does not match the target."
+msgstr "コンボボックスの現在のアカウントが対象と一致しません。"
+
+msgid "Login successful; task is set to None, skipping."
+msgstr "ログイン成功。タスクが「なし」のため、スキップします。"
+
+msgid "click drop down no effect"
+msgstr "ドロップダウンを押しても反応がありません"
+
+msgid "opened gray_book_boss"
+msgstr "残像探しを開きました"
+
+msgid "go nightmare"
+msgstr "ナイトメアの巣へ向かいます"
+
+msgid "go nightmare scroll"
+msgstr "スクロールしてナイトメアの巣を探します"
+
+msgid "nightmare nest: combat detected after pickup"
+msgstr "ナイトメアの巣: 回収後に戦闘を検出しました"
+
+#, python-brace-format
+msgid "nightmare nest unreachable, skip this run: {cache_key}"
+msgstr "ナイトメアの巣に到達できないため、今回はスキップします: {cache_key}"
+
+msgid "nightmare nest unreachable, skip this run"
+msgstr "ナイトメアの巣に到達できないため、今回はスキップします"
+
+msgid "nightmare nest: death recovered, re-enter from F2 book"
+msgstr "ナイトメアの巣: 復活したため、F2 のガイドブックから入り直します"
+
+msgid "Captured echo during combat, skipping search."
+msgstr "戦闘中に音骸を吸収したため、探索をスキップします。"
+
+msgid "farm echo walk find true"
+msgstr "移動による音骸探索に成功しました"
+
+#, python-brace-format
+msgid "{count_box} is not complete"
+msgstr "{count_box} は未完了です"
+
+msgid "no echo collected, re-teleport to current nest as fallback"
+msgstr "音骸を回収できなかったため、現在の巣に再転送します"
+
+#, python-brace-format
+msgid "skip cached unreachable nightmare nest: {cache_key}"
+msgstr "到達不可として記録済みのナイトメアの巣をスキップします: {cache_key}"
+
+#, python-brace-format
+msgid "nightmare nest: died {deaths} times, skip this run: {cache_key}"
+msgstr "ナイトメアの巣: {deaths} 回戦闘不能になったため、今回はスキップします: {cache_key}"
+
+msgid "farm echo walk find true after re-teleport"
+msgstr "再転送後、移動による音骸探索に成功しました"
+
+#, python-brace-format
+msgid "click {click}"
+msgstr "{click} をクリックします"
+
+msgid "is not claim treasure, restart challenge"
+msgstr "報酬受け取り表示がないため、再挑戦します"
+
+msgid "farm_tacet: death recovered, re-enter from F2 book"
+msgstr "無音区周回: 復活したため、F2 のガイドブックから入り直します"
+
+#, python-brace-format
+msgid ""
+"farm_tacet: exceeded recovery retries ({max_recovery_retries}), stop farming"
+msgstr "無音区周回: 復帰の再試行上限（{max_recovery_retries}）を超えたため、停止します"
+
+#, python-brace-format
+msgid "Garden finished: {texts}"
+msgstr "楽園タスク終了: {texts}"
+
+#, python-brace-format
+msgid "Task is not registered or has been removed: {module}.{class_name}"
+msgstr "タスクが未登録か削除されています: {module}.{class_name}"
+
+msgid "accounts must be a list of accounts."
+msgstr "accounts はアカウントのリストである必要があります。"
+
+msgid "Account configuration must be an object."
+msgstr "アカウント設定はオブジェクトである必要があります。"
+
+msgid ""
+"Use the login list text with all * removed as the account ID; it must not be"
+" empty or have leading or trailing spaces."
+msgstr "ログイン一覧の文字列から * をすべて除いたものをIDにしてください。空欄や前後の空白は使用できません。"
+
+#, python-brace-format
+msgid "Duplicate account ID {account}; change it before saving."
+msgstr "アカウントID {account} が重複しています。変更してから保存してください。"
+
+#, python-brace-format
+msgid "Enabled state for account {account} must be a boolean."
+msgstr "アカウント {account} の有効状態は真偽値である必要があります。"
+
+#, python-brace-format
+msgid "Account {account} is missing its task field; select a task or None."
+msgstr "アカウント {account} のタスク欄がありません。タスクまたは「なし」を選択してください。"
+
+msgid "Task reference must contain module and class."
+msgstr "タスク参照には module と class が必要です。"
+
+msgid ""
+"Multi-account configuration cannot select itself or the legacy multi-account"
+" task."
+msgstr "複数アカウント設定では、自身や旧複数アカウントタスクを選択できません。"
+
+#, python-brace-format
+msgid "Task configuration for account {account} must be an object."
+msgstr "アカウント {account} のタスク設定はオブジェクトである必要があります。"
+
+msgid "Account run history must be an object."
+msgstr "アカウントの実行履歴はオブジェクトである必要があります。"
+
+msgid "Invalid account run history format."
+msgstr "アカウントの実行履歴の形式が無効です。"
+
+msgid "Multi-account configuration is missing the accounts list."
+msgstr "複数アカウント設定に accounts リストがありません。"
+
+msgid "Multi-account configuration"
+msgstr "複数アカウント設定"
+
+msgid "Configuration saved"
+msgstr "設定を保存しました"
+
+msgid "No remaining account to run; finishing multi-account daily task"
+msgstr "実行するアカウントがないため、複数アカウントのデイリータスクを終了します"
+
+#: config.py
+msgid "Wuthering Waves"
+msgstr "鳴潮"
+
+#: src/task/MergeEchoTask.py src/task/EnhanceEchoTask.py
+#: src/task/ChangeEchoTask.py
+msgid "Echo Management"
+msgstr "音骸管理"
+
+#: src/task/MultiAccountDailyTask.py src/task/MultiAccountConfigTask.py
+msgid "Multi-account"
+msgstr "複数アカウント"
+
+#: src/task/DailyTask.py src/task/FarmEchoTask.py src/task/ForgeryTask.py
+#: src/task/GardenTask.py src/task/NightmareNestTask.py
+#: src/task/SimulationTask.py src/task/TacetTask.py
+msgid "Daily Activities"
+msgstr "デイリー・イベント"
+
+msgid "Per-account Configuration"
+msgstr "アカウント別設定"
+
+msgid "Account Configuration"
+msgstr "アカウント設定"
+
+msgid "Configure Accounts"
+msgstr "アカウントを設定"
+
+msgid "Save and Close"
+msgstr "保存して閉じる"
+
+msgid ""
+"Configure tasks separately for each account. When disabled, run the original"
+" multi-account daily task."
+msgstr "アカウントごとにタスクを設定します。無効の場合は従来の複数アカウントデイリータスクを実行します。"
+
+msgid "Edit account order, enabled accounts, tasks and task settings."
+msgstr "アカウントの順序、有効状態、実行タスクとタスク設定を編集します。"
+
+msgid "Rahai Blocks (Score Mode)"
+msgstr "ラハイロブロック（スコアモード）"
+
+msgid ""
+"Open the score board before starting. Keep the PC game in the foreground "
+"while the task plays."
+msgstr "開始前にスコアモードの盤面を開き、実行中はPC版ゲームを最前面にしてください。"
+
+msgid "Characters"
+msgstr "キャラクター"
+
+msgid "Character Code"
+msgstr "キャラクターコード"
+
+msgid "Use built in"
+msgstr "内蔵を使用"
+
+msgid "Use custom"
+msgstr "カスタムを使用"
+
+msgid "Ask AI"
+msgstr "AIに相談"
+
+msgid "How To"
+msgstr "使い方"
+
+msgid "Custom code saved"
+msgstr "カスタムコードを保存しました"
+
+msgid "Unsaved changes"
+msgstr "未保存の変更"
+
+msgid "Unsaved Changes"
+msgstr "未保存の変更"
+
+msgid "Discard unsaved character code changes?"
+msgstr "未保存のキャラクターコードの変更を破棄しますか？"
+
+msgid "Saved and reloaded"
+msgstr "保存して再読み込みしました"
+
+msgid "Custom character code saved and reloaded."
+msgstr "カスタムキャラクターコードを保存して再読み込みしました。"
+
+msgid "Custom character code saved and reloaded for loaded characters."
+msgstr "読み込み済みのキャラクターにカスタムコードを保存して再読み込みしました。"
+
+msgid "Using built in code"
+msgstr "内蔵コードを使用中"
+
+msgid "Built in character code selected."
+msgstr "内蔵キャラクターコードを選択しました。"
+
+msgid "Ask AI template copied. Paste it into an AI chatbot."
+msgstr "AI用テンプレートをコピーしました。AIチャットボットに貼り付けてください。"
+
+msgid "Copied"
+msgstr "コピー済み"
+
+msgid ""
+"Choose Use custom to edit a character's Python code. Use built-in mode to read and select the original code.\n"
+"\n"
+"Ask AI copies a prompt to the clipboard with the full current code at the top. Paste it into an AI chatbot, describe the change after 'I want to implement:', and ask it to return the full modified code.\n"
+"\n"
+"Paste the returned code back into this editor, review the highlighted changed lines, then click Save to apply changes."
+msgstr ""
+"カスタムを使用を選ぶと、キャラクターの Python コードを編集できます。内蔵モードでは元のコードを読み取り、選択できます。\n"
+"\n"
+"AIに相談は、現在の完全なコードを先頭に含むプロンプトをクリップボードにコピーします。AIチャットボットに貼り付け、'I want to implement:' の後に変更内容を書き、完全な修正済みコードを返すよう依頼してください。\n"
+"\n"
+"返されたコードをこのエディターに貼り付け、ハイライトされた変更行を確認してから、保存をクリックして変更を適用します。"
+
+msgid "How To Modify Character Code"
+msgstr "キャラクターコードの変更方法"
+
+msgid "Reset Custom Code"
+msgstr "カスタムコードをリセット"
+
+msgid "Reset this character to built in code and remove the custom code?"
+msgstr "このキャラクターを内蔵コードに戻し、カスタムコードを削除しますか？"
+
+msgid ""
+"Custom code matches built in code. Removed custom code and switched to built"
+" in."
+msgstr "カスタムコードは内蔵コードと同じです。カスタムコードを削除し、内蔵に切り替えました。"
+
+msgid ""
+"Custom code matches built in code. Removed custom code, switched to built "
+"in, and reloaded loaded characters."
+msgstr "カスタムコードは内蔵コードと同じです。削除し、内蔵に切り替え、読み込み済みキャラクターを再読み込みしました。"
+
+msgid "Custom code reset to built in code."
+msgstr "カスタムコードを内蔵コードにリセットしました。"
+
+msgid "Custom code reset to built in code and reloaded for loaded characters."
+msgstr "カスタムコードを内蔵コードにリセットし、読み込み済みキャラクターに再読み込みしました。"
+
+msgid "Contribute Code"
+msgstr "コードを貢献"
+
+msgid "I want to implement:"
+msgstr "実装したい内容:"
+
+msgid "Please modify the full {class_name} character automation code above."
+msgstr "上記の {class_name} キャラクター自動化コード全体を修正してください。"
+
+msgid ""
+"Return only the complete modified Python code for the whole file, not a "
+"patch and not an explanation."
+msgstr "パッチや説明ではなく、ファイル全体の完全な修正済み Python コードのみを返してください。"
+
+msgid ""
+"Keep the class name as {class_name}. Preserve imports that are still needed."
+msgstr "クラス名は {class_name} のままにしてください。必要な import は残してください。"
+
+msgid ""
+"Use this BaseChar reference while reasoning about helper methods, task APIs,"
+" state, switching, cooldowns, and combat flow:"
+msgstr ""
+"ヘルパーメソッド、タスク API、状態、切り替え、クールダウン、戦闘フローを検討する際は、この BaseChar リファレンスを使用してください:"
+
+msgid ""
+"Select optional tasks. Nightmare Nest runs before stamina farming to help "
+"complete the daily task; the other tasks run afterward."
+msgstr "任意のタスクを選択します。悪夢の巣はデイリー達成を補助するためスタミナ消費前に実行し、その他のタスクはその後に実行します。"
+
+msgid "All fields are required."
+msgstr "すべての項目を入力してください。"
 
 msgid "Choose Export Folder"
 msgstr "エクスポート先フォルダーを選択"
@@ -1254,12 +1962,6 @@ msgstr "チームを作成"
 
 msgid "Create or import a team to edit character code."
 msgstr "キャラクターコードを編集するには、チームを作成またはインポートしてください。"
-
-msgid "Description"
-msgstr "説明"
-
-msgid "Export"
-msgstr "エクスポート"
 
 msgid "Export Team"
 msgstr "チームをエクスポート"
@@ -1285,9 +1987,6 @@ msgstr "更新日時"
 msgid "Name"
 msgstr "名前"
 
-msgid "No shared code is available for this team."
-msgstr "このチームで共有されているコードはありません。"
-
 msgid "Reset Character Code"
 msgstr "キャラクターコードをリセット"
 
@@ -1302,9 +2001,6 @@ msgstr "エクスポートする前に変更を保存してください。"
 
 msgid "Select 3 different characters"
 msgstr "異なるキャラクターを3人選択"
-
-msgid "Size"
-msgstr "サイズ"
 
 msgid "Team"
 msgstr "チーム"
@@ -1339,9 +2035,6 @@ msgstr "このアーカイブは別のチーム用です。"
 msgid "Upload Team"
 msgstr "チームをアップロード"
 
-msgid "Version"
-msgstr "バージョン"
-
 msgid "Workshop"
 msgstr "ワークショップ"
 
@@ -1369,12 +2062,6 @@ msgstr "ワークショップの応答が無効です。"
 msgid "Workshop returned a different team."
 msgstr "ワークショップから別のチームが返されました。"
 
-msgid "Cancel"
-msgstr "キャンセル"
-
-msgid "Close"
-msgstr "閉じる"
-
 msgid "{team_name} - Team Workshop"
 msgstr "{team_name} - チームワークショップ"
 
@@ -1389,21 +2076,3 @@ msgstr "チームを削除しました。"
 
 msgid "Send Email Report After Task"
 msgstr "タスク完了後にメールレポートを送信"
-
-msgid "Rover: Electro"
-msgstr "漂泊者・電導"
-
-msgid "JingRan"
-msgstr "景燃"
-
-msgid "Multi Account Config Task"
-msgstr "複数アカウント設定タスク"
-
-msgid "Log in to accounts in card order and run tasks with independent configurations"
-msgstr "カードの順番でアカウントにログインし、個別の設定でタスクを実行します"
-
-msgid "Special Nightmare"
-msgstr "特異悪夢"
-
-msgid "Which Special Nightmare to Teleport"
-msgstr "テレポートする特異悪夢"

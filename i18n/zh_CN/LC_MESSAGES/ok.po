@@ -855,132 +855,23 @@ msgstr "传送到第几个Boss挑战"
 msgid "From Top to Bottom, Starting with 1"
 msgstr "从上到下，从1开始"
 
-msgid "Characters"
-msgstr "角色"
-
-msgid "Character Code"
-msgstr "角色代码"
-
-msgid "Use built in"
-msgstr "使用内置"
-
-msgid "Use custom"
-msgstr "使用自定义"
-
-msgid "Ask AI"
-msgstr "询问 AI"
-
-msgid "How To"
-msgstr "使用说明"
-
 msgid "Save"
 msgstr "保存"
-
-msgid "Custom code saved"
-msgstr "已保存自定义代码"
-
-msgid "Unsaved changes"
-msgstr "未保存的更改"
-
-msgid "Unsaved Changes"
-msgstr "未保存的更改"
-
-msgid "Discard unsaved character code changes?"
-msgstr "放弃未保存的角色代码更改吗？"
-
-msgid "Saved and reloaded"
-msgstr "已保存并重新加载"
-
-msgid "Custom character code saved and reloaded."
-msgstr "已保存并重新加载自定义角色代码。"
-
-msgid "Custom character code saved and reloaded for loaded characters."
-msgstr "已保存自定义角色代码，并已为已加载角色重新加载。"
 
 msgid "Success"
 msgstr "成功"
 
-msgid "Using built in code"
-msgstr "正在使用内置代码"
-
-msgid "Built in character code selected."
-msgstr "已选择内置角色代码。"
-
 msgid "Error"
 msgstr "错误"
-
-msgid "Ask AI template copied. Paste it into an AI chatbot."
-msgstr "AI 提示模板已复制。请粘贴到 AI 聊天机器人中。"
-
-msgid "Copied"
-msgstr "已复制"
-
-msgid ""
-"Choose Use custom to edit a character's Python code. Use built-in mode to read and select the original code.\n"
-"\n"
-"Ask AI copies a prompt to the clipboard with the full current code at the top. Paste it into an AI chatbot, describe the change after 'I want to implement:', and ask it to return the full modified code.\n"
-"\n"
-"Paste the returned code back into this editor, review the highlighted changed lines, then click Save to apply changes."
-msgstr ""
-"选择使用自定义来编辑角色的 Python 代码。内置模式可阅读和选择原始代码。\n"
-"\n"
-"询问 AI 会将一个提示词复制到剪贴板，提示词顶部包含当前完整代码。将其粘贴到 AI 聊天机器人中，在 'I want to implement:' 后描述你想修改的内容，并要求它返回完整修改后的代码。\n"
-"\n"
-"将返回的代码粘贴回此编辑器，检查高亮的变更行，然后点击保存以应用更改。"
-
-msgid "How To Modify Character Code"
-msgstr "如何修改角色代码"
 
 msgid "Reset"
 msgstr "重置"
 
-msgid "Reset Custom Code"
-msgstr "重置自定义代码"
-
-msgid "Reset this character to built in code and remove the custom code?"
-msgstr "将此角色重置为内置代码并移除自定义代码吗？"
-
-msgid ""
-"Custom code matches built in code. Removed custom code and switched to built"
-" in."
-msgstr "自定义代码与内置代码相同。已移除自定义代码并切换到内置。"
-
-msgid ""
-"Custom code matches built in code. Removed custom code, switched to built "
-"in, and reloaded loaded characters."
-msgstr "自定义代码与内置代码相同。已移除自定义代码，切换到内置，并重新加载已加载角色。"
-
-msgid "Custom code reset to built in code."
-msgstr "自定义代码已重置为内置代码。"
-
-msgid "Custom code reset to built in code and reloaded for loaded characters."
-msgstr "自定义代码已重置为内置代码，并已为已加载角色重新加载。"
-
-msgid "Contribute Code"
-msgstr "贡献代码"
-
-msgid "I want to implement:"
-msgstr "我想实现："
-
-msgid "Please modify the full {class_name} character automation code above."
-msgstr "请修改上面完整的 {class_name} 角色自动化代码。"
-
-msgid ""
-"Return only the complete modified Python code for the whole file, not a "
-"patch and not an explanation."
-msgstr "只返回整个文件完整修改后的 Python 代码，不要返回补丁或解释。"
-
-msgid ""
-"Keep the class name as {class_name}. Preserve imports that are still needed."
-msgstr "保持类名为 {class_name}。保留仍然需要的 import。"
-
-msgid ""
-"Use this BaseChar reference while reasoning about helper methods, task APIs,"
-" state, switching, cooldowns, and combat flow:"
-msgstr "在思考辅助方法、任务 API、状态、切人、冷却和战斗流程时，请使用这个 BaseChar 参考："
-
 msgid "Rover: Spectro"
 msgstr "漂泊者·衍射"
+
+msgid "Rover: Electro"
+msgstr "漂泊者·导电"
 
 msgid "Rover: Havoc"
 msgstr "漂泊者·湮灭"
@@ -1168,8 +1059,8 @@ msgid "Merge Discarded Echoes"
 msgstr "融合已弃置声骸"
 
 msgid ""
-"Must have 1000 discarded Echo to Run, Merge discarded Echoes in full "
-"batches of 100."
+"Must have 1000 discarded Echo to Run, Merge discarded Echoes in full batches"
+" of 100."
 msgstr "运行前必须有1000个已弃置声骸，每批融合100个。"
 
 msgid "Bag Key"
@@ -1196,13 +1087,18 @@ msgstr "已弃置声骸超过1000时融合"
 msgid "Additional Tasks to Run After Daily Task"
 msgstr "每日任务后运行的附加任务"
 
-msgid "Select optional tasks. Nightmare Nest runs before stamina farming to help complete the daily task; the other tasks run afterward."
-msgstr "选择可选任务。梦魇巢穴会在消耗体力前运行，以协助完成每日任务；其他任务将在之后运行。"
+msgid ""
+"Nightmare Nest runs after stamina farming. If Tacet Suppression yielded "
+"rewards, daily rewards are claimed before Nightmare Nest."
+msgstr "梦魇巢穴会在消耗波片后运行。如果已领取无音区奖励，会先领取每日奖励，再刷梦魇巢穴。"
 
-msgid "Teleport and Farm 4C Echo requires \"Teleport to Boss\" to be enabled in Farm Echo Task."
+msgid ""
+"Teleport and Farm 4C Echo requires \"Teleport to Boss\" to be enabled in "
+"Farm Echo Task."
 msgstr "选择“传送并刷取4C声骸”时，必须在刷取声骸任务中启用“传送至首领”。"
 
-msgid "Auto Farm all Nightmare Nest requires at least one \"Which to Farm\" option."
+msgid ""
+"Auto Farm all Nightmare Nest requires at least one \"Which to Farm\" option."
 msgstr "选择“自动刷取所有梦魇巢穴”时，“刷取目标”必须至少选择一项。"
 
 msgid "Daily Task Completed"
@@ -1286,11 +1182,822 @@ msgstr "点击B进入背包，在过滤器中选择需要强化的声骸，并�
 msgid "游戏与okww语言必须为简体/繁体中文,必须16:9分辨率,使用1600x900以上分辨率, 勾选需要的, 没勾的都会自动合成"
 msgstr "游戏与okww语言必须为简体/繁体中文，分辨率必须为16:9且不低于1600x900。勾选需要保留的声骸，未勾选的会自动合成。"
 
-msgid "All fields are required."
-msgstr "所有字段均为必填项。"
-
 msgid "Author"
 msgstr "作者"
+
+msgid "Description"
+msgstr "描述"
+
+msgid "Export"
+msgstr "导出"
+
+msgid "No shared code is available for this team."
+msgstr "此队伍暂无共享代码。"
+
+msgid "Size"
+msgstr "大小"
+
+msgid "Version"
+msgstr "版本"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Close"
+msgstr "关闭"
+
+msgid "JingRan"
+msgstr "景燃"
+
+msgid "Multi Account Config Task"
+msgstr "多账号配置执行"
+
+msgid ""
+"Log in to accounts in card order and run tasks with independent "
+"configurations"
+msgstr "按卡片顺序登录账号，并使用各账号的独立配置执行任务"
+
+msgid "Hsin"
+msgstr "心"
+
+msgid "Special Nightmare"
+msgstr "特异梦魇"
+
+msgid "Which Special Nightmare to Teleport"
+msgstr "传送到第几个特异梦魇"
+
+msgid "Failed to read game assets quality config. Starting with HD assets."
+msgstr "读取游戏资源画质配置失败，将使用高清（HD）资源启动。"
+
+msgid "Roccia C6"
+msgstr "洛可可6链（主输出）"
+
+#, python-brace-format
+msgid "could not find char {index} {info} {highest_confidence}"
+msgstr "无法识别角色 {index} {info} {highest_confidence}"
+
+msgid "can not open wheel"
+msgstr "无法打开工具轮盘"
+
+msgid "on_combat_check failed"
+msgstr "战斗状态检查失败"
+
+#, python-brace-format
+msgid "enter combat {has_lavitator}"
+msgstr "进入战斗，控物状态：{has_lavitator}"
+
+msgid "Characters dead"
+msgstr "角色已阵亡"
+
+msgid "click m to open the map"
+msgstr "按 M 打开地图"
+
+msgid "Abyss start prompt disappeared, force enter combat"
+msgstr "深渊开始提示已消失，强制进入战斗"
+
+msgid "Can not find a teleport to heal"
+msgstr "找不到用于治疗的传送点"
+
+msgid "Can not find the travel button"
+msgstr "找不到快速旅行按钮"
+
+msgid "raise_not_in_combat char dead"
+msgstr "角色阵亡，已离开战斗"
+
+msgid "wait condition failed while walking"
+msgstr "行走时等待条件失败"
+
+#, python-brace-format
+msgid "set_key {key} to {name}"
+msgstr "将按键 {key} 识别为 {name}"
+
+msgid "Could not reach the Abyss challenge start"
+msgstr "无法到达深渊挑战起点"
+
+msgid "Could not load the Abyss team"
+msgstr "无法加载深渊队伍"
+
+#, python-brace-format
+msgid "loaded chars success {c} {confidence}"
+msgstr "角色加载成功：{c}，置信度：{confidence}"
+
+msgid "start walk_to_treasure"
+msgstr "开始走向奖励"
+
+#, python-brace-format
+msgid "angle: {my_angle}, to_turn: {to_turn}"
+msgstr "当前角度：{my_angle}，需转动：{to_turn}"
+
+#, python-brace-format
+msgid "open_boss_book {name}"
+msgstr "打开残象探寻：{name}"
+
+#, python-brace-format
+msgid "click {book_key} to open the book"
+msgstr "按 {book_key} 打开终端"
+
+msgid "zoom map to max"
+msgstr "将地图缩放至最大"
+
+#, python-brace-format
+msgid "Can not find {feature} on minimap"
+msgstr "小地图上找不到 {feature}"
+
+#, python-brace-format
+msgid "changed direction {angle} {current_direction} -> {new_direction}"
+msgstr "转向 {angle}：{current_direction} -> {new_direction}"
+
+msgid "monthly_card found click"
+msgstr "检测到月卡奖励，点击领取"
+
+#, python-brace-format
+msgid "send {book_key} key to open"
+msgstr "按 {book_key} 打开"
+
+msgid "send f2 key mouse key to open the book"
+msgstr "按 F2 并点击鼠标以打开终端"
+
+msgid "can't find boss_proceed"
+msgstr "找不到前往挑战按钮"
+
+msgid "find_function not found, change to opposite direction"
+msgstr "未找到交互提示，改为反方向移动"
+
+msgid "cant find the f to enter"
+msgstr "找不到进入的 F 交互提示"
+
+msgid "can not walk to treasure!"
+msgstr "无法走到奖励处！"
+
+#, python-brace-format
+msgid "yolo found echo {echos}"
+msgstr "YOLO 检测到声骸：{echos}"
+
+msgid "Close the notice!"
+msgstr "关闭公告!"
+
+msgid "Game update completed; the game will restart"
+msgstr "游戏更新成功, 游戏即将重启"
+
+#, python-brace-format
+msgid "start_device end {result}"
+msgstr "设备启动结束：{result}"
+
+msgid "must be in game world and in teams"
+msgstr "必须处于游戏大世界中且已编队"
+
+msgid "not on the wall, stop running"
+msgstr "已离开墙面，停止奔跑"
+
+msgid "on the wall, start running"
+msgstr "已在墙面上，开始奔跑"
+
+msgid "Click the Agree button!"
+msgstr "点击同意按钮!"
+
+#, python-brace-format
+msgid "Click Start Game! {start}"
+msgstr "点击开始游戏! {start}"
+
+#, python-brace-format
+msgid "wait_login {switch_login} {boxes}"
+msgstr "等待登录：{switch_login} {boxes}"
+
+msgid "can't find boss_proceed after scroll"
+msgstr "滚动后仍找不到前往挑战按钮"
+
+msgid "Click the Login button!"
+msgstr "点击登录按钮!"
+
+#, python-brace-format
+msgid "unknown_lang {name}"
+msgstr "不支持的语言：{name}"
+
+msgid "Start after filtering Echoes on the bag's Echo screen!"
+msgstr "必须在背包声骸界面过滤后开始!"
+
+#, python-brace-format
+msgid ""
+"No more Echoes to modify. Finished! Enhanced: {total}, matching: {matching}"
+msgstr "无可修改声骸, 任务结束! 强化{total}个, 符合条件{matching}个"
+
+msgid "Cannot find the current main stat!"
+msgstr "找不到当前主属性!"
+
+msgid "The target stat matches the current stat. Change the Echo filter!"
+msgstr "目标属性和当前属性相同, 请修改声骸过滤条件!"
+
+#, python-brace-format
+msgid "Cannot open screenshot folder: {e}"
+msgstr "无法打开截图文件夹: {e}"
+
+msgid "check weekly garden"
+msgstr "检查每周乐园任务"
+
+msgid "check discarded echo"
+msgstr "检查已弃置声骸"
+
+msgid "battle pass"
+msgstr "领取先约电台奖励"
+
+msgid "open_daily"
+msgstr "打开每日任务"
+
+msgid "claim daily reward via  coordinate"
+msgstr "通过坐标领取每日奖励"
+
+msgid "weekly garden not completed, run GardenTask"
+msgstr "每周乐园任务未完成，开始执行"
+
+msgid "can not battle pass, maybe ended"
+msgstr "无法领取先约电台奖励，可能已结束"
+
+msgid "no_boss_proceed, click claim"
+msgstr "没有前往按钮，点击领取"
+
+msgid "weekly garden already completed"
+msgstr "每周乐园任务已完成"
+
+msgid "GardenTask Failed"
+msgstr "乐园任务失败"
+
+msgid "MergeEchoTask Failed"
+msgstr "声骸合成任务失败"
+
+msgid "NightmareNestTask Failed"
+msgstr "梦魇巢穴任务失败"
+
+msgid "farm_domain: death recovered, re-enter from F2 book"
+msgstr "副本刷取：复活成功，从 F2 终端重新进入"
+
+msgid "\"self.stamina_once\" must be override"
+msgstr "必须重写 self.stamina_once"
+
+#, python-brace-format
+msgid ""
+"farm_domain: exceeded recovery retries ({max_recovery_retries}), stop "
+"farming"
+msgstr "副本刷取：超过恢复重试上限（{max_recovery_retries}），停止刷取"
+
+msgid "farm_in_domain: death recovered, exiting domain"
+msgstr "副本内刷取：复活成功，正在退出副本"
+
+msgid "Does not meet the requirements; discarding"
+msgstr "不符合条件 丢弃"
+
+msgid "Succeeded and locked"
+msgstr "成功并上锁"
+
+msgid "The first substat must be valid; discarding"
+msgstr "第一条必须为有效词条, 丢弃"
+
+msgid "Not enough remaining slots for the required valid substats; discarding"
+msgstr "剩余孔位不足以达到设定的有效词条数量, 丢弃"
+
+msgid "Failed to discard!"
+msgstr "弃置失败!"
+
+msgid "Failed to lock!"
+msgstr "上锁失败!"
+
+msgid "Matching Echo found; task paused"
+msgstr "符合条件的声骸，已暂停任务"
+
+#, python-brace-format
+msgid ""
+"No more Echoes to enhance. Finished! Enhanced: {total}, matching: {matching}"
+msgstr "无可强化声骸, 任务结束! 强化{total}个, 符合条件{matching}个"
+
+#, python-brace-format
+msgid "ocr values: {texts}"
+msgstr "OCR 识别结果：{texts}"
+
+#, python-brace-format
+msgid ""
+"Cannot obtain both CRIT stats ({missing_crit} missing, {remaining_slots} "
+"slots left); discarding"
+msgstr "无法凑齐双爆 (缺{missing_crit}种, 剩{remaining_slots}孔), 丢弃"
+
+#, python-brace-format
+msgid "Combined CRIT score {total_score:.1f} < {minimum}; discarding"
+msgstr "双爆总计 {total_score:.1f} < {minimum}，丢弃"
+
+msgid "Cannot determine the Echo's discard state!"
+msgstr "无法找到声骸弃置状态!"
+
+msgid "Discarded successfully!"
+msgstr "成功弃置!"
+
+msgid "Cannot determine the Echo's lock state!"
+msgstr "无法找到声骸上锁状态!"
+
+msgid "Locked successfully!"
+msgstr "成功上锁!"
+
+msgid "Enable staged material insertion in enhancement settings!"
+msgstr "强化设置需要开启阶段放入!"
+
+msgid "Enable simultaneous tuning in enhancement settings!"
+msgstr "强化设置需要开启同步调谐!"
+
+msgid "Cannot find Enhance and Tune!"
+msgstr "找不到 强化并调谐!"
+
+#, python-brace-format
+msgid "Invalid substat {p} before both CRIT stats; discarding"
+msgstr "双爆出现前存在无效词条 {p}, 丢弃"
+
+#, python-brace-format
+msgid "First CRIT Rate {v} < {minimum}; discarding"
+msgstr "首条暴击 {v} < {minimum}，丢弃"
+
+#, python-brace-format
+msgid "First CRIT DMG {v} < {minimum}; discarding"
+msgstr "首条爆伤 {v} < {minimum}，丢弃"
+
+#, python-brace-format
+msgid "in_realm: {_in_realm}"
+msgstr "处于副本中：{_in_realm}"
+
+#, python-brace-format
+msgid "teleport_to_boss prepared as {walk_result}"
+msgstr "首领传送准备结果：{walk_result}"
+
+msgid "walk after boss teleport until combat or F"
+msgstr "传送到首领后继续行走，直到进入战斗或出现 F 提示"
+
+msgid "Teleport to boss failed"
+msgstr "传送到首领失败"
+
+msgid "Teleport to boss failed: can not walk to combat or F"
+msgstr "传送到首领失败：无法走入战斗或找到 F 提示"
+
+msgid "_has_treasure = True"
+msgstr "检测到可领取奖励"
+
+#, python-brace-format
+msgid "profile: {boss} {settings}"
+msgstr "首领配置：{boss} {settings}"
+
+#, python-brace-format
+msgid "teleport_to_nearest_boss {box}"
+msgstr "传送到最近的首领：{box}"
+
+msgid "Teleport to boss failed: can not find F before entering realm"
+msgstr "传送到首领失败：进入副本前找不到 F 提示"
+
+#, python-brace-format
+msgid "Can not find boss level {boss_level}"
+msgstr "找不到首领等级 {boss_level}"
+
+#, python-brace-format
+msgid "teleport_to_nearest_boss {aim_boss}"
+msgstr "传送到最近的首领：{aim_boss}"
+
+msgid "Can not find the boss octagon on map"
+msgstr "地图上找不到首领的八边形标记"
+
+msgid "scroll_and_click_buttons"
+msgstr "滚动并点击按钮"
+
+msgid "start wait in combat"
+msgstr "开始等待战斗"
+
+#, python-brace-format
+msgid "combat_wait_time: {combat_wait_time}"
+msgstr "战斗等待时间：{combat_wait_time}"
+
+#, python-brace-format
+msgid "Night elapsed: {night_elapsed:.1f}s"
+msgstr "夜间已用时间：{night_elapsed:.1f}秒"
+
+msgid "boss not found"
+msgstr "找不到首领"
+
+msgid "farm 4c: death recovered, teleport to boss again"
+msgstr "四费声骸刷取：复活成功，重新传送到首领"
+
+#, python-brace-format
+msgid "Unknown Teleport to Boss config: {teleport_to_boss}"
+msgstr "未知的首领传送配置：{teleport_to_boss}"
+
+#, python-brace-format
+msgid ""
+"farm 4c: exceeded recovery retries ({max_recovery_retries}), stop farming"
+msgstr "四费声骸刷取：超过恢复重试上限（{max_recovery_retries}），停止刷取"
+
+msgid "Farm failed after walking into boss combat, teleporting again"
+msgstr "走入首领战斗后刷取失败，正在重新传送"
+
+msgid "Fenrico teleport_to_nearest_boss failed"
+msgstr "芬莱克最近首领传送失败"
+
+msgid "not in combat try click restart"
+msgstr "未进入战斗，尝试点击重新挑战"
+
+#, python-brace-format
+msgid "Loaded {loaded} from {total} Stars"
+msgstr "从 {total} 个星标中加载了 {loaded} 个"
+
+msgid "can not find my cords on big map!"
+msgstr "无法在大地图上找到当前位置！"
+
+msgid "cannot find any stars, stop farming"
+msgstr "找不到任何星标，停止刷取"
+
+#, python-brace-format
+msgid "reached star {star} {distance} {star_move_distance_threshold}"
+msgstr "已到达星标 {star}，距离：{distance}，阈值：{star_move_distance_threshold}"
+
+msgid "too far from next star, stop farming"
+msgstr "距离下个星标过远，停止刷取"
+
+msgid "Starting task"
+msgstr "开始任务"
+
+msgid "On the main screen"
+msgstr "在主页"
+
+msgid "Five-to-one merge completed!"
+msgstr "五合一完成!"
+
+#, python-brace-format
+msgid "keeps: {count} set_name: {set_name} keep: {keeps}"
+msgstr "保留 {count} 个，套装：{set_name}，保留项：{keeps}"
+
+msgid "Keep all; skipping"
+msgstr "保存所有, 跳过"
+
+msgid "ATK% not selected; skipping step two"
+msgstr "没有选择攻击力百分比, 跳过第二步"
+
+#, python-brace-format
+msgid "Failed to recognize stat list! {choices}"
+msgstr "属性列表识别失败! {choices}"
+
+#, python-brace-format
+msgid "Fewer than 5 Echoes in {set_name}"
+msgstr "{set_name} 不够5个"
+
+#, python-brace-format
+msgid "Not in configuration: {set_name} {name}; selecting for merge!"
+msgstr "不在配置 {set_name} {name} 选择合成!"
+
+#, python-brace-format
+msgid "Index out of range, max is {total_number}"
+msgstr "索引超出范围，最大值为 {total_number}"
+
+msgid "Garden task completed; limit reached"
+msgstr "乐园任务完成, 已达到上限"
+
+#, python-brace-format
+msgid "Garden current: {current}"
+msgstr "当前乐园进度：{current}"
+
+#, python-brace-format
+msgid "click {name} {confidence:.3f}"
+msgstr "点击 {name}，置信度：{confidence:.3f}"
+
+msgid "click garden_get_confirm"
+msgstr "点击乐园奖励确认按钮"
+
+#, python-brace-format
+msgid "can not open bag with hotkey {hotkey}"
+msgstr "无法使用快捷键 {hotkey} 打开背包"
+
+msgid "All full batches of discarded Echoes have been merged."
+msgstr "所有满批次的已弃置声骸均已合成。"
+
+msgid "Must have 1000 discarded Echo to Run"
+msgstr "需要至少 1000 个已弃置声骸才能运行"
+
+msgid "Add accounts and save the configuration first."
+msgstr "请先添加账号并保存配置。"
+
+#, python-brace-format
+msgid "ComboBox account switch failed; falling back to OCR: {error_type}"
+msgstr "ComboBox 切号失败，回退 OCR：{error_type}"
+
+#, python-brace-format
+msgid "Account confirmation mismatch; retrying {attempt}/5"
+msgstr "账号确认不匹配，重试 {attempt}/5"
+
+#, python-brace-format
+msgid "Cannot confirm target account {account}; stopping login."
+msgstr "无法确认目标账号 {account}，停止登录。"
+
+#, python-brace-format
+msgid "{account} logged in successfully"
+msgstr "{account} 登录成功"
+
+#, python-brace-format
+msgid "Failed to save account run history: {error}"
+msgstr "保存账号运行记录失败：{error}"
+
+#, python-brace-format
+msgid "Account {account} not found in the login list"
+msgstr "账号列表中未找到 {account}"
+
+msgid "ComboBox account selection had no effect."
+msgstr "ComboBox 账号选择未生效。"
+
+msgid "Current ComboBox account does not match the target."
+msgstr "ComboBox 当前账号与目标不一致。"
+
+msgid "Login successful; task is set to None, skipping."
+msgstr "登录成功；执行任务为“无”，跳过任务。"
+
+msgid "click drop down no effect"
+msgstr "点击下拉列表无效"
+
+msgid "opened gray_book_boss"
+msgstr "已打开残象探寻"
+
+msgid "go nightmare"
+msgstr "前往梦魇巢穴"
+
+msgid "go nightmare scroll"
+msgstr "滚动查找梦魇巢穴"
+
+msgid "nightmare nest: combat detected after pickup"
+msgstr "梦魇巢穴：拾取后检测到战斗"
+
+#, python-brace-format
+msgid "nightmare nest unreachable, skip this run: {cache_key}"
+msgstr "梦魇巢穴无法到达，跳过本次：{cache_key}"
+
+msgid "nightmare nest unreachable, skip this run"
+msgstr "梦魇巢穴无法到达，跳过本次"
+
+msgid "nightmare nest: death recovered, re-enter from F2 book"
+msgstr "梦魇巢穴：复活成功，从 F2 终端重新进入"
+
+msgid "Captured echo during combat, skipping search."
+msgstr "战斗中已吸收声骸，跳过搜索。"
+
+msgid "farm echo walk find true"
+msgstr "行走搜索声骸成功"
+
+#, python-brace-format
+msgid "{count_box} is not complete"
+msgstr "{count_box} 尚未完成"
+
+msgid "no echo collected, re-teleport to current nest as fallback"
+msgstr "未吸收到声骸，重新传送到当前巢穴重试"
+
+#, python-brace-format
+msgid "skip cached unreachable nightmare nest: {cache_key}"
+msgstr "跳过已缓存的无法到达的梦魇巢穴：{cache_key}"
+
+#, python-brace-format
+msgid "nightmare nest: died {deaths} times, skip this run: {cache_key}"
+msgstr "梦魇巢穴：阵亡 {deaths} 次，跳过本次：{cache_key}"
+
+msgid "farm echo walk find true after re-teleport"
+msgstr "重新传送后行走搜索声骸成功"
+
+#, python-brace-format
+msgid "click {click}"
+msgstr "点击 {click}"
+
+msgid "is not claim treasure, restart challenge"
+msgstr "未出现领取奖励提示，重新挑战"
+
+msgid "farm_tacet: death recovered, re-enter from F2 book"
+msgstr "无音区刷取：复活成功，从 F2 终端重新进入"
+
+#, python-brace-format
+msgid ""
+"farm_tacet: exceeded recovery retries ({max_recovery_retries}), stop farming"
+msgstr "无音区刷取：超过恢复重试上限（{max_recovery_retries}），停止刷取"
+
+#, python-brace-format
+msgid "Garden finished: {texts}"
+msgstr "乐园任务结束：{texts}"
+
+#, python-brace-format
+msgid "Task is not registered or has been removed: {module}.{class_name}"
+msgstr "任务未注册或已移除：{module}.{class_name}"
+
+msgid "accounts must be a list of accounts."
+msgstr "accounts 必须是账号列表。"
+
+msgid "Account configuration must be an object."
+msgstr "账号配置必须是对象。"
+
+msgid ""
+"Use the login list text with all * removed as the account ID; it must not be"
+" empty or have leading or trailing spaces."
+msgstr "账号标识请填写登录列表文本去掉所有 * 后的剩余部分，不可为空或包含首尾空格。"
+
+#, python-brace-format
+msgid "Duplicate account ID {account}; change it before saving."
+msgstr "账号标识 {account} 重复，请修改后再保存。"
+
+#, python-brace-format
+msgid "Enabled state for account {account} must be a boolean."
+msgstr "账号 {account} 的启用状态必须是布尔值。"
+
+#, python-brace-format
+msgid "Account {account} is missing its task field; select a task or None."
+msgstr "账号 {account} 缺少执行任务字段，请选择任务或“无”。"
+
+msgid "Task reference must contain module and class."
+msgstr "任务标识必须包含 module 和 class。"
+
+msgid ""
+"Multi-account configuration cannot select itself or the legacy multi-account"
+" task."
+msgstr "不允许在“多账号配置”中选择多账号执行器自身或旧多账号任务。"
+
+#, python-brace-format
+msgid "Task configuration for account {account} must be an object."
+msgstr "账号 {account} 的任务配置必须是对象。"
+
+msgid "Account run history must be an object."
+msgstr "账号运行记录必须是对象。"
+
+msgid "Invalid account run history format."
+msgstr "账号运行记录格式无效。"
+
+msgid "Multi-account configuration is missing the accounts list."
+msgstr "多账号配置缺少 accounts 列表。"
+
+msgid "Multi-account configuration"
+msgstr "多账号配置"
+
+msgid "Configuration saved"
+msgstr "配置已保存"
+
+msgid "No remaining account to run; finishing multi-account daily task"
+msgstr "没有剩余账号需要执行，多账号日常任务结束"
+
+#: config.py
+msgid "Wuthering Waves"
+msgstr "鸣潮"
+
+#: src/task/MergeEchoTask.py src/task/EnhanceEchoTask.py
+#: src/task/ChangeEchoTask.py
+msgid "Echo Management"
+msgstr "声骸管理"
+
+#: src/task/MultiAccountDailyTask.py src/task/MultiAccountConfigTask.py
+msgid "Multi-account"
+msgstr "多账号"
+
+#: src/task/DailyTask.py src/task/FarmEchoTask.py src/task/ForgeryTask.py
+#: src/task/GardenTask.py src/task/NightmareNestTask.py
+#: src/task/SimulationTask.py src/task/TacetTask.py
+msgid "Daily Activities"
+msgstr "日常活动"
+
+msgid "Per-account Configuration"
+msgstr "分别配置"
+
+msgid "Account Configuration"
+msgstr "账号配置"
+
+msgid "Configure Accounts"
+msgstr "配置账号"
+
+msgid "Save and Close"
+msgstr "保存并关闭"
+
+msgid ""
+"Configure tasks separately for each account. When disabled, run the original"
+" multi-account daily task."
+msgstr "为每个账号分别配置任务。关闭时执行原有多账号每日任务。"
+
+msgid "Edit account order, enabled accounts, tasks and task settings."
+msgstr "编辑账号顺序、启用状态、执行任务及任务配置。"
+
+msgid "Rahai Blocks (Score Mode)"
+msgstr "拉海洛方块（积分模式）"
+
+msgid ""
+"Open the score board before starting. Keep the PC game in the foreground "
+"while the task plays."
+msgstr "启动前打开积分棋盘。运行时请将电脑端游戏保持在前台。"
+
+msgid "Characters"
+msgstr "角色"
+
+msgid "Character Code"
+msgstr "角色代码"
+
+msgid "Use built in"
+msgstr "使用内置"
+
+msgid "Use custom"
+msgstr "使用自定义"
+
+msgid "Ask AI"
+msgstr "询问 AI"
+
+msgid "How To"
+msgstr "使用说明"
+
+msgid "Custom code saved"
+msgstr "已保存自定义代码"
+
+msgid "Unsaved changes"
+msgstr "未保存的更改"
+
+msgid "Unsaved Changes"
+msgstr "未保存的更改"
+
+msgid "Discard unsaved character code changes?"
+msgstr "放弃未保存的角色代码更改吗？"
+
+msgid "Saved and reloaded"
+msgstr "已保存并重新加载"
+
+msgid "Custom character code saved and reloaded."
+msgstr "已保存并重新加载自定义角色代码。"
+
+msgid "Custom character code saved and reloaded for loaded characters."
+msgstr "已保存自定义角色代码，并已为已加载角色重新加载。"
+
+msgid "Using built in code"
+msgstr "正在使用内置代码"
+
+msgid "Built in character code selected."
+msgstr "已选择内置角色代码。"
+
+msgid "Ask AI template copied. Paste it into an AI chatbot."
+msgstr "AI 提示模板已复制。请粘贴到 AI 聊天机器人中。"
+
+msgid "Copied"
+msgstr "已复制"
+
+msgid ""
+"Choose Use custom to edit a character's Python code. Use built-in mode to read and select the original code.\n"
+"\n"
+"Ask AI copies a prompt to the clipboard with the full current code at the top. Paste it into an AI chatbot, describe the change after 'I want to implement:', and ask it to return the full modified code.\n"
+"\n"
+"Paste the returned code back into this editor, review the highlighted changed lines, then click Save to apply changes."
+msgstr ""
+"选择使用自定义来编辑角色的 Python 代码。内置模式可阅读和选择原始代码。\n"
+"\n"
+"询问 AI 会将一个提示词复制到剪贴板，提示词顶部包含当前完整代码。将其粘贴到 AI 聊天机器人中，在 'I want to implement:' 后描述你想修改的内容，并要求它返回完整修改后的代码。\n"
+"\n"
+"将返回的代码粘贴回此编辑器，检查高亮的变更行，然后点击保存以应用更改。"
+
+msgid "How To Modify Character Code"
+msgstr "如何修改角色代码"
+
+msgid "Reset Custom Code"
+msgstr "重置自定义代码"
+
+msgid "Reset this character to built in code and remove the custom code?"
+msgstr "将此角色重置为内置代码并移除自定义代码吗？"
+
+msgid ""
+"Custom code matches built in code. Removed custom code and switched to built"
+" in."
+msgstr "自定义代码与内置代码相同。已移除自定义代码并切换到内置。"
+
+msgid ""
+"Custom code matches built in code. Removed custom code, switched to built "
+"in, and reloaded loaded characters."
+msgstr "自定义代码与内置代码相同。已移除自定义代码，切换到内置，并重新加载已加载角色。"
+
+msgid "Custom code reset to built in code."
+msgstr "自定义代码已重置为内置代码。"
+
+msgid "Custom code reset to built in code and reloaded for loaded characters."
+msgstr "自定义代码已重置为内置代码，并已为已加载角色重新加载。"
+
+msgid "Contribute Code"
+msgstr "贡献代码"
+
+msgid "I want to implement:"
+msgstr "我想实现："
+
+msgid "Please modify the full {class_name} character automation code above."
+msgstr "请修改上面完整的 {class_name} 角色自动化代码。"
+
+msgid ""
+"Return only the complete modified Python code for the whole file, not a "
+"patch and not an explanation."
+msgstr "只返回整个文件完整修改后的 Python 代码，不要返回补丁或解释。"
+
+msgid ""
+"Keep the class name as {class_name}. Preserve imports that are still needed."
+msgstr "保持类名为 {class_name}。保留仍然需要的 import。"
+
+msgid ""
+"Use this BaseChar reference while reasoning about helper methods, task APIs,"
+" state, switching, cooldowns, and combat flow:"
+msgstr "在思考辅助方法、任务 API、状态、切人、冷却和战斗流程时，请使用这个 BaseChar 参考："
+
+msgid ""
+"Select optional tasks. Nightmare Nest runs before stamina farming to help "
+"complete the daily task; the other tasks run afterward."
+msgstr "选择可选任务。梦魇巢穴会在消耗体力前运行，以协助完成每日任务；其他任务将在之后运行。"
+
+msgid "All fields are required."
+msgstr "所有字段均为必填项。"
 
 msgid "Choose Export Folder"
 msgstr "选择导出文件夹"
@@ -1303,12 +2010,6 @@ msgstr "创建队伍"
 
 msgid "Create or import a team to edit character code."
 msgstr "创建或导入队伍以编辑角色代码。"
-
-msgid "Description"
-msgstr "描述"
-
-msgid "Export"
-msgstr "导出"
 
 msgid "Export Team"
 msgstr "导出队伍"
@@ -1334,9 +2035,6 @@ msgstr "修改时间"
 msgid "Name"
 msgstr "名称"
 
-msgid "No shared code is available for this team."
-msgstr "此队伍暂无共享代码。"
-
 msgid "Reset Character Code"
 msgstr "重置角色代码"
 
@@ -1351,9 +2049,6 @@ msgstr "请先保存更改再导出。"
 
 msgid "Select 3 different characters"
 msgstr "选择3个不同的角色"
-
-msgid "Size"
-msgstr "大小"
 
 msgid "Team"
 msgstr "队伍"
@@ -1388,9 +2083,6 @@ msgstr "该压缩包属于其他队伍。"
 msgid "Upload Team"
 msgstr "上传队伍"
 
-msgid "Version"
-msgstr "版本"
-
 msgid "Workshop"
 msgstr "工坊"
 
@@ -1418,12 +2110,6 @@ msgstr "工坊响应无效。"
 msgid "Workshop returned a different team."
 msgstr "工坊返回了其他队伍。"
 
-msgid "Cancel"
-msgstr "取消"
-
-msgid "Close"
-msgstr "关闭"
-
 msgid "{team_name} - Team Workshop"
 msgstr "{team_name} - 队伍工坊"
 
@@ -1438,27 +2124,6 @@ msgstr "队伍已删除。"
 
 msgid "Send Email Report After Task"
 msgstr "任务完成后发送邮件汇报"
-
-msgid "Rover: Electro"
-msgstr "漂泊者·导电"
-
-msgid "JingRan"
-msgstr "景燃"
-
-msgid "Multi Account Config Task"
-msgstr "多账号配置执行"
-
-msgid "Log in to accounts in card order and run tasks with independent configurations"
-msgstr "按卡片顺序登录账号，并使用各账号的独立配置执行任务"
-
-msgid "Hsin"
-msgstr "心"
-
-msgid "Special Nightmare"
-msgstr "特异梦魇"
-
-msgid "Which Special Nightmare to Teleport"
-msgstr "传送到第几个特异梦魇"
 
 #: extensions/daily_task_retry.py
 msgid "Daily Task Failure Retries"

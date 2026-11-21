@@ -26,6 +26,7 @@ class TestHeadlessImports(unittest.TestCase):
             sys.meta_path.insert(0, BlockWin32())
             import src.task.WWOneTimeTask
             import src.combat.CombatCheck
+            import src.task.RahaiBlocksTask
             from unittest.mock import patch
             sys.platform = 'linux'
             from src.task.MultiAccountConfigTask import MultiAccountConfigTask
@@ -94,6 +95,23 @@ class TestWWOneTimeTaskCompatibility(unittest.TestCase):
         task.executor.get_task_by_class.assert_not_called()
         task.executor.interaction.activate.assert_not_called()
         task.sleep.assert_called_once_with(0.5)
+
+    def test_browser_run_resets_combat_before_startup_sleep(self):
+        task = WWOneTimeTask()
+        task.executor = MagicMock()
+        task.is_browser = MagicMock(return_value=True)
+        calls = MagicMock()
+        task.reset_combat_state = calls.reset_combat_state
+        task.sleep = calls.sleep
+
+        task.run()
+
+        self.assertEqual(calls.method_calls, [
+            call.reset_combat_state('onetime task start'),
+            call.sleep(0.5),
+        ])
+        task.executor.get_task_by_class.assert_not_called()
+        task.executor.interaction.activate.assert_not_called()
 
     def test_native_run_keeps_mouse_reset_and_post_message_activation(self):
         class FakePostMessageInteraction:

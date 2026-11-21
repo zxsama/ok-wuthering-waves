@@ -1,5 +1,5 @@
 # Linux cloud-task runtime.  ok-script itself is installed from a verified,
-# metadata-adjusted wheel in Dockerfile because 2.0.15b2 declares Win32-only
+# metadata-adjusted wheel in Dockerfile because 3.0.7 declares Win32-only
 # packages unconditionally.  Keep this list pinned and validate it with
 # ``python -m pip check`` during the image build.
 certifi==2026.7.22
@@ -8,14 +8,14 @@ greenlet==3.5.5
 idna==3.18
 fastapi==0.141.1
 numpy==2.5.2
-onnxocr-ppocrv5==0.0.22
+onnxocr-ppocrv6[openvino]==0.0.1
 opencv-python-headless==5.0.0.93
-openvino==2026.3.0
+openvino==2026.4.1
 openvino-telemetry==2025.2.0
 pillow==12.3.0
 playwright==1.62.0
 psutil==7.2.2
-pyappify==1.0.13
+pyappify==1.0.20
 pyclipper==1.4.0
 pyee==13.0.1
 requests==2.34.2

@@ -163,21 +163,26 @@ Docker `json-file` log at 10 MiB, retaining five files by default. Override
 
 ## Current limits
 
-- The real cloud-game flow has completed end to end under Docker Xvfb/noVNC at
-  1280×720. Repeat-run throughput, long-session stability and performance on
-  slower hosts still need broader measurement.
+- Earlier runtime versions completed the real cloud-game flow under Docker
+  Xvfb/noVNC at 1280×720. The ok-script 3.0.7 upgrade still requires a fresh
+  Linux image build and end-to-end verification.
 - The initial image targets `linux/amd64`, matching the Google Chrome package
   used by this Dockerfile. Other architectures need a separate browser image.
 - The image pins the Linux runtime, including headless OpenCV, OCR and OpenVINO.
   Qt is deliberately absent because the runner uses ok-script's headless core.
-- `ok-script==2.0.15b2` incorrectly declares native Windows input/audio packages
+- `ok-script==3.0.7` incorrectly declares native Windows input/audio packages
   for every platform. During the image build, the exact upstream wheel is
   checked against a fixed SHA-256 and a copied wheel has only those unused
   dependency declarations removed. Two device-backend aggregate initializers
   are reduced to their platform-neutral base exports because Python executes
-  those files before importing a base submodule. All other package source is
-  unchanged, `pip check` must pass, and the build imports every configured task.
-  Remove this compatibility step after upstream publishes platform markers.
+  those files before importing a base submodule. Targeted platform guards also
+  cover graphics/DPI setup, screenshot fonts, notifications and sleep prevention.
+  `pip check` must pass, and the build imports every configured task and the
+  management UI. Remove these patches only when upstream covers these Linux paths.
+- ok-script 3.0.7 removed its Web UI and web extra. The cloud management UI is
+  retained locally in `extensions/cloud/management_web`, with its original
+  license, fixed artifact hash and modifications documented in `UPSTREAM.md`.
+  It uses the current 3.0.7 core and explicit FastAPI/Uvicorn dependencies.
 - CAPTCHA, account verification, payment, and other sensitive dialogs remain
   manual operations.
 - The management UI and noVNC are safe by default only because both port

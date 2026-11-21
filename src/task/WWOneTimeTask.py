@@ -1,6 +1,9 @@
 class WWOneTimeTask:
 
     def run(self):
+        # Reset interrupted rotations on the executor before startup can sleep.
+        if hasattr(self, 'reset_combat_state'):
+            self.reset_combat_state('onetime task start')
         if not self.is_browser():
             # MouseResetTask and PostMessageInteraction are Windows-only.  A
             # cloud task neither needs the cursor reset loop nor a native

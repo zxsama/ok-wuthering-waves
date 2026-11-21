@@ -1,5 +1,7 @@
 import unittest
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
+
+from ok import og
 
 from config import key_config_option
 from src.Labels import Labels
@@ -14,11 +16,14 @@ from src.task.DailyTask import (
 from src.task.FarmEchoTask import FarmEchoTask
 from src.task.MergeEchoTask import FULL_BATCH_PATTERN, MergeEchoTask
 from src.task.NightmareNestTask import NightmareNestTask
+from src.task.TacetTask import TacetTask
+from src.task.WWOneTimeTask import WWOneTimeTask
+from src.task.task_icons import task_icon
 
 
 class TestMergeEchoTask(unittest.TestCase):
 
-    def test_ungrouped_tasks_and_global_bag_hotkey_metadata(self):
+    def test_task_categories_and_global_bag_hotkey_metadata(self):
         executor = Mock()
         executor.scene = None
         executor.global_config.get_config.return_value = {}
@@ -27,14 +32,17 @@ class TestMergeEchoTask(unittest.TestCase):
         merge_task = MergeEchoTask(executor, app)
         farm_task = FarmEchoTask(executor, app)
 
-        self.assertIsNone(merge_task.group_name)
-        self.assertIsNone(farm_task.group_name)
+        self.assertEqual('Echo Management', merge_task.group_name)
+        self.assertEqual(task_icon('category-echo'), merge_task.group_icon)
+        self.assertEqual('Daily Activities', farm_task.group_name)
+        self.assertEqual(task_icon('category-daily'), farm_task.group_icon)
         self.assertNotIn("Bag Key", merge_task.default_config)
         self.assertEqual(key_config_option.default_config["Bag Key"], "b")
         self.assertIn("Bag Key", key_config_option.config_description)
 
     def setUp(self):
         self.task = MergeEchoTask.__new__(MergeEchoTask)
+        self.task.tr = str
         self.task.key_config = {"Bag Key": "v"}
         self.task.ensure_main = Mock()
         self.task.send_key = Mock()
@@ -168,6 +176,47 @@ class TestMergeEchoTask(unittest.TestCase):
 
 class TestDailyMergeEchoTask(unittest.TestCase):
 
+    def test_daily_claims_before_nightmare_when_tacet_rewards_were_collected(self):
+        self.assert_tacet_and_nightmare_order(240, [
+            call.claim_daily(), call.run_task_by_class(NightmareNestTask),
+        ])
+
+    def test_daily_claims_after_nightmare_when_tacet_yields_no_rewards(self):
+        self.assert_tacet_and_nightmare_order(0, [
+            call.run_task_by_class(NightmareNestTask), call.claim_daily(),
+        ])
+
+    def assert_tacet_and_nightmare_order(self, stamina_spent, expected_order):
+        daily_task = DailyTask.__new__(DailyTask)
+        daily_task.support_tasks = ["Tacet Suppression", "Forgery Challenge", "Simulation Challenge"]
+        daily_task.config = {ADDITIONAL_TASKS: [AUTO_FARM_NIGHTMARE_NEST]}
+        daily_task.open_daily = Mock(return_value=(0, False))
+        daily_task.ensure_main = Mock()
+        daily_task.sleep = Mock()
+        daily_task.claim_mail = Mock()
+        daily_task.claim_battle_pass = Mock()
+        daily_task.log_debug = Mock()
+        daily_task.log_info = Mock()
+        daily_task.tr = str
+        actions = Mock()
+        actions.farm_tacet.return_value = stamina_spent
+        tacet_task = Mock()
+        tacet_task.farm_tacet = actions.farm_tacet
+        nightmare_task = Mock(config={"Which to Farm": ["Nightmare Purification"]})
+        daily_task.get_task_by_class = Mock(
+            side_effect={TacetTask: tacet_task, NightmareNestTask: nightmare_task}.__getitem__,
+        )
+        daily_task.run_task_by_class = actions.run_task_by_class
+        daily_task.claim_daily = actions.claim_daily
+
+        with patch.object(WWOneTimeTask, 'run'), patch.object(og, 'my_app', Mock()):
+            daily_task.run()
+
+        self.assertEqual(actions.mock_calls, [
+            call.farm_tacet(daily=True, used_stamina=0, config=daily_task.config),
+            *expected_order,
+        ])
+
     def test_daily_additional_tasks_metadata(self):
         executor = Mock()
         executor.scene = None
@@ -195,6 +244,7 @@ class TestDailyMergeEchoTask(unittest.TestCase):
 
     def test_daily_runs_only_post_daily_selected_tasks(self):
         daily_task = DailyTask.__new__(DailyTask)
+        daily_task.tr = str
         daily_task.config = {
             ADDITIONAL_TASKS: [
                 CHECK_WEEKLY_GARDEN,
@@ -231,6 +281,7 @@ class TestDailyMergeEchoTask(unittest.TestCase):
 
     def test_daily_does_not_alert_farm_echo_when_not_selected(self):
         daily_task = DailyTask.__new__(DailyTask)
+        daily_task.tr = str
         daily_task.config = {ADDITIONAL_TASKS: [CHECK_WEEKLY_GARDEN]}
         daily_task.check_weekly_garden = Mock()
         daily_task.check_discarded_echo = Mock()
@@ -244,6 +295,7 @@ class TestDailyMergeEchoTask(unittest.TestCase):
 
     def test_daily_suppresses_and_restores_not_enough_echo_notification(self):
         daily_task = DailyTask.__new__(DailyTask)
+        daily_task.tr = str
         daily_task.info_set = Mock()
         daily_task.log_info = Mock()
         merge_echo_task = Mock()
@@ -263,6 +315,7 @@ class TestDailyMergeEchoTask(unittest.TestCase):
 
     def test_daily_rejects_farm_echo_without_teleport(self):
         daily_task = DailyTask.__new__(DailyTask)
+        daily_task.tr = str
         daily_task.config = {ADDITIONAL_TASKS: [TELEPORT_AND_FARM_4C_ECHO]}
         farm_echo_task = Mock()
         farm_echo_task.config = {"Teleport to Boss": "No"}
@@ -277,6 +330,7 @@ class TestDailyMergeEchoTask(unittest.TestCase):
 
     def test_daily_rejects_nightmare_without_selection(self):
         daily_task = DailyTask.__new__(DailyTask)
+        daily_task.tr = str
         daily_task.config = {ADDITIONAL_TASKS: [AUTO_FARM_NIGHTMARE_NEST]}
         nightmare_task = Mock()
         nightmare_task.config = {"Which to Farm": []}
@@ -291,6 +345,7 @@ class TestDailyMergeEchoTask(unittest.TestCase):
 
     def test_daily_accepts_valid_additional_task_configs(self):
         daily_task = DailyTask.__new__(DailyTask)
+        daily_task.tr = str
         daily_task.config = {
             ADDITIONAL_TASKS: [TELEPORT_AND_FARM_4C_ECHO, AUTO_FARM_NIGHTMARE_NEST],
         }
@@ -311,6 +366,7 @@ class TestDailyMergeEchoTask(unittest.TestCase):
 
     def test_daily_stops_before_initialization_when_additional_config_is_invalid(self):
         daily_task = DailyTask.__new__(DailyTask)
+        daily_task.tr = str
         daily_task.validate_additional_tasks = Mock(side_effect=Exception('invalid additional task config'))
         daily_task.ensure_main = Mock()
 
