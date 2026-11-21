@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from .browser_capture import PlaywrightBrowserCapture
+from .browser_geometry import BrowserRect
 from .browser_interaction import PlaywrightBrowserInteraction
 from .models import CloudConfigurationError
 
@@ -28,7 +29,7 @@ class CloudDeviceManager:
         adapter: Any,
         *,
         exit_event: Any = None,
-        frame_size: tuple[int, int] = DEFAULT_FRAME_SIZE,
+        frame_size: tuple[int, int] | None = None,
     ) -> None:
         try:
             # Import only the platform-neutral bases.  The compatibility
@@ -51,11 +52,15 @@ class CloudDeviceManager:
         self.exit_event = exit_event
         self.executor = None
         self.hwnd_window = None
-        self.supported_ratio = frame_size[0] / frame_size[1]
+        # ok-script uses this as the artwork's design ratio to position anchors.
+        self.supported_ratio = 16 / 9
+        initial_size = frame_size or getattr(adapter, "viewport", DEFAULT_FRAME_SIZE)
         capture_transport = PlaywrightBrowserCapture(page_call, output_size=frame_size)
-        interaction_transport = PlaywrightBrowserInteraction(
-            page_call, coordinate_size=frame_size, viewport=frame_size
-        )
+
+        def input_geometry(page):
+            return BrowserRect.from_page(page), (self.width, self.height)
+
+        interaction_transport = PlaywrightBrowserInteraction(page_call, input_geometry=input_geometry)
 
         class OkCloudCapture(BaseCaptureMethod):
             name = capture_transport.name
@@ -63,10 +68,13 @@ class CloudDeviceManager:
 
             def __init__(self) -> None:
                 super().__init__()
-                self._size = frame_size
+                self._size = initial_size
 
             def do_get_frame(self):
-                return capture_transport.do_get_frame()
+                return capture_transport.get_frame()
+
+            def do_get_frame_wait(self, timeout):
+                return capture_transport.get_frame(busy_wait=timeout)
 
             def connected(self) -> bool:
                 return capture_transport.connected()
@@ -93,6 +101,9 @@ class CloudDeviceManager:
 
             def should_capture(self) -> bool:
                 return interaction_transport.should_capture()
+
+            def clickable(self) -> bool:
+                return capture_transport.connected()
 
             def on_run(self) -> None:
                 interaction_transport.on_run()
@@ -130,6 +141,7 @@ class CloudDeviceManager:
         self.capture_method = OkCloudCapture()
         self.capture_method.exit_event = exit_event
         self.interaction = OkCloudInteraction(self.capture_method)
+        self.drag_interaction = self.interaction
         # A few upstream helpers expect the interaction to expose its capture.
         self.interaction.capture = self.capture_method
         self.config: dict[str, Any] = {
@@ -309,8 +321,12 @@ def create_cloud_ok_class(manager: CloudDeviceManager) -> type:
                 manager.capture_method.exit_event = self.exit_event
             super().__init__(config)
             from .daily_task import install_daily_task_support
+            from .monthly_card import install_monthly_card_check
             from .tacet_task import install_tacet_task_support
 
+            feature_set = getattr(self, "feature_set", None)
+            if feature_set is not None:
+                install_monthly_card_check(feature_set)
             install_daily_task_support(self.task_executor)
             install_tacet_task_support(self.task_executor)
 

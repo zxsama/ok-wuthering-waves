@@ -249,7 +249,8 @@ class DailyTask(WWOneTimeTask, BaseCombatTask):
         points_boxes = self.ocr(0.19, 0.8, 0.30, 0.93, match=number_re)
         if points_boxes:
             try:
-                points = int(re.sub(r'\D', '', points_boxes[0].name))
+                current_points = re.split(r'[/／]', points_boxes[0].name, maxsplit=1)[0]
+                points = int(re.sub(r'\D', '', current_points))
             except Exception:
                 points = 0
         else:

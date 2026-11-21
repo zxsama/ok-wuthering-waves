@@ -203,10 +203,6 @@ msgid ""
 "Your computer's local time when the monthly card will popup, hour in (1-24)"
 msgstr "월정액 팝업이 표시될 현지 시간 (1~24시)"
 
-msgid ""
-"must be in game world and in teams, please check you game resolution is 16:9"
-msgstr "게임 월드의 팀 상태여야 합니다. 게임 해상도가 16:9인지 확인하세요"
-
 msgid "Capture Frame Count"
 msgstr "프레임 캡처 횟수"
 
@@ -322,11 +318,6 @@ msgstr "로렐라이"
 
 msgid "click f2 to open the book"
 msgstr "F2를 눌러 도감을 여세요"
-
-msgid ""
-"Check configs to keep, click start in game world, must be in a 16:9 screen "
-"ratio"
-msgstr "유지할 설정을 확인한 뒤 게임 월드에서 시작을 클릭하세요. 화면 비율은 16:9여야 합니다"
 
 msgid "Boss"
 msgstr "보스"
@@ -1129,10 +1120,8 @@ msgstr "B를 눌러 가방을 열고 필터에서 주 옵션을 변경할 에코
 msgid "点击B进入背包, 在过滤器中选择需要强化的声骸, 并按照等级从0排序后开始."
 msgstr "B를 눌러 가방을 열고 필터에서 강화할 에코를 선택한 뒤, 레벨 0부터 오름차순으로 정렬하고 시작하세요."
 
-msgid "游戏与okww语言必须为简体/繁体中文,必须16:9分辨率,使用1600x900以上分辨率, 勾选需要的, 没勾的都会自动合成"
-msgstr ""
-"게임과 okww 언어는 중국어 간체/번체여야 하며, 16:9 비율의 1600x900 이상 해상도가 필요합니다. 필요한 항목을 체크하면 "
-"체크하지 않은 항목은 자동으로 합성됩니다."
+msgid "游戏与 okww 语言须为简体或繁体中文，分辨率至少为 1600×900。勾选需要保留的声骸，未勾选的会自动合成。"
+msgstr "게임과 okww 언어를 중국어 간체 또는 번체로 설정하고 1600×900 이상의 해상도를 사용하세요. 보관할 에코를 선택하세요. 선택하지 않은 에코는 자동 합성됩니다."
 
 msgid "Switch to Healer before and after Combat"
 msgstr "전투 전후에 힐러로 전환"

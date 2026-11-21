@@ -49,7 +49,7 @@ class Board:
 
 
 def canonical_frame(frame):
-    if frame is None or abs(frame.shape[1] / frame.shape[0] - 16 / 9) > 0.012:
+    if frame is None or frame.ndim != 3 or frame.shape[2] < 3 or not frame.size:
         return None
     return cv2.resize(frame[:, :, :3], (WIDTH, HEIGHT), interpolation=cv2.INTER_AREA)
 

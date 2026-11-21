@@ -12,11 +12,13 @@ import threading
 from collections.abc import Callable
 from typing import Any, TypeVar
 
+from .browser_geometry import BrowserRect
 from .models import CloudPageError
 
 
 _T = TypeVar("_T")
 PageCall = Callable[[Callable[[Any], _T]], _T]
+InputGeometry = tuple[BrowserRect, tuple[int, int]]
 
 
 class PlaywrightBrowserInteraction:
@@ -105,6 +107,7 @@ class PlaywrightBrowserInteraction:
         *,
         coordinate_size: tuple[int, int] = (1280, 720),
         viewport: tuple[int, int] = (1280, 720),
+        input_geometry: Callable[[Any], InputGeometry] | None = None,
     ) -> None:
         if not callable(page_call):
             raise TypeError("page_call must be callable")
@@ -114,6 +117,7 @@ class PlaywrightBrowserInteraction:
         self._page_call = page_call
         self.coordinate_size = coordinate_size
         self.viewport = viewport
+        self._input_geometry = input_geometry
         self._held_keys: list[str] = []
         self._held_buttons: list[str] = []
         self._cursor_position: tuple[int, int] | None = None
@@ -163,11 +167,14 @@ class PlaywrightBrowserInteraction:
     ) -> None:
         if duration < 0 or settle_time < 0:
             raise ValueError("swipe duration and settle_time must be non-negative")
-        start = self._map_point(from_x, from_y)
-        end = self._map_point(to_x, to_y)
+        if not all(map(math.isfinite, (from_x, from_y, to_x, to_y))):
+            raise ValueError("coordinates must be finite")
         steps = max(int(duration / 20), 5)
 
-        def action(page: Any) -> None:
+        def action(page: Any) -> tuple[int, int]:
+            bounds, size = self._geometry(page)
+            start = bounds.map_point(from_x, from_y, size)
+            end = bounds.map_point(to_x, to_y, size)
             page.mouse.move(*start)
             page.mouse.down(button="left")
             try:
@@ -183,10 +190,10 @@ class PlaywrightBrowserInteraction:
                     page.wait_for_timeout(settle_time * 1000)
             finally:
                 page.mouse.up(button="left")
+            return end
 
         with self._lock:
-            self._page_call(action)
-            self._cursor_position = end
+            self._cursor_position = self._page_call(action)
 
     def mouse_down(
         self,
@@ -198,15 +205,18 @@ class PlaywrightBrowserInteraction:
         button = self._map_button(key)
         point = self._optional_point(x, y)
 
-        def action(page: Any) -> None:
+        def action(page: Any) -> tuple[int, int] | None:
+            mapped = None
             if point is not None:
-                page.mouse.move(*point)
+                mapped = self._map_point(page, point)
+                page.mouse.move(*mapped)
             page.mouse.down(button=button)
+            return mapped
 
         with self._lock:
-            self._page_call(action)
-            if point is not None:
-                self._cursor_position = point
+            mapped = self._page_call(action)
+            if mapped is not None:
+                self._cursor_position = mapped
             if button not in self._held_buttons:
                 self._held_buttons.append(button)
 
@@ -219,10 +229,16 @@ class PlaywrightBrowserInteraction:
                 self._held_buttons.remove(button)
 
     def move(self, x: float, y: float) -> None:
-        point = self._map_point(x, y)
+        if not math.isfinite(x) or not math.isfinite(y):
+            raise ValueError("coordinates must be finite")
+
+        def action(page: Any) -> tuple[int, int]:
+            mapped = self._map_point(page, (x, y))
+            page.mouse.move(*mapped)
+            return mapped
+
         with self._lock:
-            self._page_call(lambda page: page.mouse.move(*point))
-            self._cursor_position = point
+            self._cursor_position = self._page_call(action)
 
     def click(
         self,
@@ -237,45 +253,46 @@ class PlaywrightBrowserInteraction:
         button = self._map_button(key)
         point = self._optional_point(x, y)
         direction = self._INWARD_CLICK_DIRECTIONS.get(name)
-        if point is not None and direction is not None:
-            point = self._map_point(
-                x + self.coordinate_size[0] * self._INWARD_CLICK_DISTANCE * direction,
-                y,
-            )
         delay = self._delay_ms(down_time)
 
         with self._lock:
             previous = self._cursor_position
 
-            def action(page: Any) -> None:
+            def action(page: Any) -> tuple[int, int] | None:
                 if point is None:
                     page.mouse.down(button=button)
                     if delay:
                         page.wait_for_timeout(delay)
                     page.mouse.up(button=button)
-                elif point is not None:
-                    page.mouse.click(*point, button=button, delay=delay)
-
-                if move_back and previous is not None and point is not None and move:
+                    return previous
+                bounds, size = self._geometry(page)
+                # The button cap offset scales with the template artwork.
+                offset = min(size[0], size[1] * 16 / 9) * self._INWARD_CLICK_DISTANCE
+                mapped = bounds.map_point(x + offset * (direction or 0), y, size)
+                page.mouse.click(*mapped, button=button, delay=delay)
+                if move_back and previous is not None and move:
                     page.mouse.move(*previous)
+                    return previous
+                return mapped
 
-            self._page_call(action)
-            if point is not None and not (move_back and previous is not None and move):
-                self._cursor_position = point
+            self._cursor_position = self._page_call(action)
 
     def scroll(self, x: float, y: float, scroll_amount: float) -> None:
         point = self._optional_point(x, y)
         delta_y = -float(scroll_amount) * 100.0
 
-        def action(page: Any) -> None:
+        def action(page: Any) -> tuple[int, int] | None:
+            mapped = None
             if point is not None:
-                page.mouse.move(*point)
+                mapped = self._map_point(page, point)
+                page.mouse.move(*mapped)
             page.mouse.wheel(0, delta_y)
+            return mapped
 
         with self._lock:
-            self._page_call(action)
-            if point is not None:
-                self._cursor_position = point
+            mapped = self._page_call(action)
+            if mapped is not None:
+                self._cursor_position = mapped
 
     def release_all_keys(self) -> None:
         """Best-effort release of every key held through this adapter."""
@@ -336,24 +353,23 @@ class PlaywrightBrowserInteraction:
     def on_destroy(self) -> None:
         self.release_all()
 
-    def _optional_point(self, x: float, y: float) -> tuple[int, int] | None:
+    def _optional_point(self, x: float, y: float) -> tuple[float, float] | None:
         if x == -1 and y == -1:
             return None
         if x == -1 or y == -1:
             raise ValueError("x and y must both be provided or both be -1")
-        return self._map_point(x, y)
-
-    def _map_point(self, x: float, y: float) -> tuple[int, int]:
         if not math.isfinite(x) or not math.isfinite(y):
             raise ValueError("coordinates must be finite")
-        source_width, source_height = self.coordinate_size
-        viewport_width, viewport_height = self.viewport
-        mapped_x = round(float(x) * viewport_width / source_width)
-        mapped_y = round(float(y) * viewport_height / source_height)
-        return (
-            min(max(mapped_x, 0), viewport_width - 1),
-            min(max(mapped_y, 0), viewport_height - 1),
-        )
+        return x, y
+
+    def _geometry(self, page: Any) -> InputGeometry:
+        if self._input_geometry is not None:
+            return self._input_geometry(page)
+        return BrowserRect(0, 0, *self.viewport), self.coordinate_size
+
+    def _map_point(self, page: Any, point: tuple[float, float]) -> tuple[int, int]:
+        bounds, size = self._geometry(page)
+        return bounds.map_point(*point, size)
 
     @classmethod
     def _map_key(cls, key: Any) -> str:

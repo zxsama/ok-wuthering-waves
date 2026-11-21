@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+import tempfile
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -19,7 +20,7 @@ from typing import Any
 
 from .cloud_schedules import ScheduledTaskRequest
 from .config import CloudSettings
-from .models import AuthenticationRequiredError, CloudConfigurationError
+from .models import AuthenticationRequiredError, CloudConfigurationError, CloudSessionState
 from .notifier import SmtpFailureNotifier, SmtpSettings
 from .ok_bridge import CloudDeviceManager, create_cloud_ok_class
 from .profile import ProfileStore
@@ -455,10 +456,72 @@ class CloudWebController:
         return self.manual_game_status()
 
     def task_action(self, task_identifier: str, action: str):
+        if action in {"enable", "disable"}:
+            task, is_trigger = self.runtime.ok.get_task(task_identifier)
+            if is_trigger:
+                with self.runtime.task_config_lock:
+                    result = self._set_trigger_enabled(task, action == "enable")
+                if action == "disable" and task is self._active_task:
+                    self._close_active_game(task_identifier)
+                return result
         result = self._original_task_action(task_identifier, action)
         if action in {"disable", "stop"}:
             self._close_active_game(task_identifier)
         return result
+
+    def _set_trigger_enabled(self, task: Any, enabled: bool):
+        from .management_web.app import _task_payload
+
+        previous = task.config["_enabled"]
+        interactive = (
+            enabled and not self.runtime.executor.paused
+            and self.session.state == CloudSessionState.IN_GAME
+            and not self.session.browser_closed()
+        )
+        self._save_trigger_preference(task.config, enabled)
+        try:
+            if not enabled:
+                # Preserve task-specific cleanup, including AutoCombatTask's reset.
+                task.disable()
+            elif interactive:
+                if not previous:
+                    task._enabled = False  # Repair a partially failed upstream enable.
+                task.enable()
+            else:
+                # TriggerTask.on_create restores this same flag on a fresh launch.
+                # The executor picks it up when resumed in game.
+                task._enabled = True
+                if self._task_state_signal is not None:
+                    self._task_state_signal.emit(task)
+        except Exception:
+            task._enabled = previous
+            self._save_trigger_preference(task.config, previous)
+            if self._task_state_signal is not None:
+                self._task_state_signal.emit(task)
+            raise
+        return _task_payload(task)
+
+    @staticmethod
+    def _save_trigger_preference(config: Any, enabled: bool) -> None:
+        # Upstream Config.save_file logs and suppresses write failures. Commit
+        # the complete config before publishing the flag or invoking enable().
+        if not config.validate("_enabled", enabled):
+            raise ValueError("Invalid trigger preference")
+        path = Path(config.config_file)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=path.parent, delete=False
+            ) as handle:
+                temporary = Path(handle.name)
+                json.dump({**config, "_enabled": enabled}, handle, ensure_ascii=False, indent=4)
+            os.replace(temporary, path)
+        except OSError as exc:
+            raise RuntimeError(f"Could not save trigger preference: {exc}") from exc
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        dict.__setitem__(config, "_enabled", enabled)
 
     def stop_task(self):
         result = self._original_stop_task()
@@ -564,6 +627,8 @@ class CloudWebController:
         self._close_active_game(succeeded=True)
 
     def _on_task_state_changed(self, task: Any) -> None:
+        if task is not None and task is not self._active_task:
+            return
         with self._lock:
             active_task = self._active_task
             if active_task is None:
@@ -756,7 +821,7 @@ def create_cloud_web_app(
 
     @app.post("/api/cloud-game/stop", include_in_schema=False)
     async def stop_cloud_game():
-        return controller.stop_game_manually()
+        return await asyncio.to_thread(controller.stop_game_manually)
 
     @app.get("/api/docker-update", include_in_schema=False)
     async def docker_update_status():

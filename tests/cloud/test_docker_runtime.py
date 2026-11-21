@@ -248,7 +248,8 @@ def test_cloud_image_installs_pinned_web_server_dependencies():
     assert "uvicorn[standard]==0.52.4" in requirements
 
 
-def test_container_uses_sandbox_compatible_adapter_without_extra_privileges():
+def test_container_uses_sandbox_compatible_adapter_without_extra_privileges(monkeypatch):
+    monkeypatch.delenv("CLOUD_SCREEN", raising=False)
     expected = "docker.playwright_adapter:create_playwright_adapter"
 
     assert f"OK_WW_CLOUD_ADAPTER: ${{OK_WW_CLOUD_ADAPTER:-{expected}}}" in _read(
@@ -275,6 +276,29 @@ def test_container_uses_sandbox_compatible_adapter_without_extra_privileges():
         "--hide-crash-restore-bubble",
         "--disable-features=Translate,TranslateUI",
     } <= set(adapter.launch_args)
+
+
+@pytest.mark.parametrize(("screen", "viewport"), [
+    ("1600x1000", (1600, 900)), ("1920x810", (1440, 810)),
+    ("1024x768", (1024, 576)), ("1366x768", (1360, 765)),
+    ("720x1280", (720, 405)), ("1920x1080", (1920, 1080)),
+])
+def test_docker_game_viewport_fits_configured_desktop(monkeypatch, screen, viewport):
+    from docker.playwright_adapter import create_playwright_adapter
+
+    monkeypatch.setenv("CLOUD_SCREEN", screen + "x24")
+    adapter = create_playwright_adapter()
+    assert adapter.viewport == viewport
+    assert f"--window-size={screen.replace('x', ',')}" in adapter.launch_args
+
+
+@pytest.mark.parametrize("screen", ["1600x0x24", "8x8x24", "broken"])
+def test_docker_game_viewport_rejects_invalid_screen(monkeypatch, screen):
+    from docker.playwright_adapter import create_playwright_adapter
+
+    monkeypatch.setenv("CLOUD_SCREEN", screen)
+    with pytest.raises(CloudPageError, match="CLOUD_SCREEN"):
+        create_playwright_adapter()
 
 
 def test_docker_adapter_removes_stale_chrome_singletons(tmp_path, monkeypatch):

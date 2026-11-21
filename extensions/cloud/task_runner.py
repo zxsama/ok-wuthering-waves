@@ -31,6 +31,8 @@ def build_cloud_task_config(source: dict[str, Any]) -> dict[str, Any]:
 
     config = copy.deepcopy(source)
     config.pop("gui", None)
+    # The cloud device owns its capture geometry and input mapping.
+    config.pop("supported_resolution", None)
     config["use_gui"] = False
     config["use_overlay"] = False
     config["check_mutex"] = False

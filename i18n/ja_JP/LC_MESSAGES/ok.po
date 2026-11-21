@@ -203,10 +203,6 @@ msgid ""
 "Your computer's local time when the monthly card will popup, hour in (1-24)"
 msgstr "月パスのポップアップが表示されるPCのローカル時間 (1-24時)"
 
-msgid ""
-"must be in game world and in teams, please check you game resolution is 16:9"
-msgstr "フィールドのチーム内にいる必要があります。ゲーム解像度が16:9であることを確認してください。"
-
 msgid "Capture Frame Count"
 msgstr "キャプチャ回数"
 
@@ -322,11 +318,6 @@ msgstr "ローレライ"
 
 msgid "click f2 to open the book"
 msgstr "F2でガイドブックを開く"
-
-msgid ""
-"Check configs to keep, click start in game world, must be in a 16:9 screen "
-"ratio"
-msgstr "保持する設定にチェックを入れ、フィールドで開始してください。16:9の画面比率である必要があります。"
 
 msgid "Boss"
 msgstr "ボス"
@@ -1126,9 +1117,8 @@ msgstr "Bキーでバッグを開き、フィルターでメインステータ�
 msgid "点击B进入背包, 在过滤器中选择需要强化的声骸, 并按照等级从0排序后开始."
 msgstr "Bキーでバッグを開き、フィルターで強化する音骸を選択し、レベル0から昇順に並べて開始してください。"
 
-msgid "游戏与okww语言必须为简体/繁体中文,必须16:9分辨率,使用1600x900以上分辨率, 勾选需要的, 没勾的都会自动合成"
-msgstr ""
-"ゲームとokwwの言語は簡体字/繁体字中国語、解像度は16:9かつ1600x900以上が必要です。必要なものにチェックを入れると、未チェックのものは自動合成されます。"
+msgid "游戏与 okww 语言须为简体或繁体中文，分辨率至少为 1600×900。勾选需要保留的声骸，未勾选的会自动合成。"
+msgstr "ゲームと okww の言語を簡体字または繁体字中国語にし、解像度を 1600×900 以上に設定してください。残したい音骸にチェックを入れてください。チェックのないものは自動合成されます。"
 
 msgid "Switch to Healer before and after Combat"
 msgstr "戦闘前後にヒーラーへ切り替える"

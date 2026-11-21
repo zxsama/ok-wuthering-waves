@@ -240,9 +240,9 @@ config = {
         'min_height': 800,
     },
     'supported_resolution': {
+        # ok-script uses this reference for HUD anchors. Adding min_size here
+        # also enables its aspect-ratio check at startup.
         'ratio': '16:9',
-        'resize_to': [(2560, 1440), (1920, 1080), (1600, 900), (1280, 720)],
-        'min_size': (1280, 720)
     },
     'links': {
         'default': {

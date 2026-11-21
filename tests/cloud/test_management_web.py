@@ -1,3 +1,4 @@
+from concurrent.futures import Future
 from types import SimpleNamespace
 
 import asyncio
@@ -85,3 +86,56 @@ def test_section_reset_preserves_other_settings_and_includes_inactive_children()
     runtime.ok = SimpleNamespace(task_executor=SimpleNamespace(global_config=store))
     runtime.reset_settings("Options", "Capture")
     assert config == {"Mode": True, "Quality": 3, "Other setting": 5}
+
+
+def test_script_run_waits_for_reload_and_uses_task_start_entry_point(tmp_path):
+    from extensions.cloud.management_web.app import WebRuntime
+
+    class EditedTask:
+        name = "Shared display name"
+
+    path = tmp_path / "EditedTask.py"
+    path.touch()
+    task = EditedTask()
+    reload_result = Future()
+    manager = SimpleNamespace(
+        task_folder=tmp_path, task_map={task: (path, "")}, task_errors={},
+        reload_task_code=lambda _: SimpleNamespace(future=reload_result),
+    )
+    runtime = object.__new__(WebRuntime)
+    runtime.ok = SimpleNamespace(task_manager=manager)
+    starts = []
+    runtime.start_task = starts.append
+
+    reload_result.set_exception(SyntaxError("invalid task"))
+    assert runtime.run_script(path.name, "invalid code")["error"] == "invalid task"
+    assert starts == []
+
+    reload_result = Future()
+    reload_result.set_result([task])
+    assert runtime.run_script(path.name, "# edited")["error"] is None
+    assert starts == [f"{EditedTask.__module__}.EditedTask"]
+
+
+def test_script_recording_capability_controls_both_recording_routes(monkeypatch):
+    instance = SimpleNamespace(device_manager=SimpleNamespace(), task_executor=SimpleNamespace(get_all_tasks=list))
+    app = create_web_app({}, ok_instance=instance)
+    runtime = app.state.runtime
+
+    async def probe():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client:
+            url = "/api/scripts-record"
+            assert (await client.get(url + "/capabilities")).json() == {"available": False}
+            for action in ("start", "stop"):
+                result = await client.post(url + "/" + action, json={})
+                assert result.status_code == 501 and "Windows" in result.json()["detail"]
+
+            started = []
+            instance.device_manager.get_hwnd_name = lambda: "test window"
+            recorder = SimpleNamespace(is_recording=False, start=started.append)
+            monkeypatch.setattr(runtime, "script_recorder", lambda: recorder)
+            assert (await client.get(url + "/capabilities")).json() == {"available": True}
+            assert (await client.post(url + "/start")).json()["recording"] is True
+            assert started == ["test window"]
+
+    asyncio.run(probe())

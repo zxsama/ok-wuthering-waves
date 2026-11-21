@@ -10,12 +10,14 @@ lets the cloud session manage login, queueing, and tab shutdown.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from threading import Lock
 from typing import Any
 
 import cv2
 import numpy as np
+
+from .browser_geometry import BrowserRect
 
 
 class BrowserCaptureError(RuntimeError):
@@ -37,7 +39,7 @@ class FrameMetrics:
 
 
 class PlaywrightBrowserCapture:
-    """Capture a fixed-size 16:9 BGR frame from an existing Playwright page."""
+    """Capture the visible game surface as BGR, optionally resizing the output."""
 
     name = "Playwright Browser Capture"
     description = "Capture an existing Playwright page as normalized BGR frames"
@@ -46,16 +48,15 @@ class PlaywrightBrowserCapture:
         self,
         page_or_call: Any,
         *,
-        output_size: tuple[int, int] = (1280, 720),
+        output_size: tuple[int, int] | None = None,
         black_pixel_threshold: int = 12,
         black_ratio_threshold: float = 0.98,
         static_difference_threshold: float = 0.002,
     ) -> None:
-        width, height = output_size
-        if width <= 0 or height <= 0:
-            raise ValueError("output dimensions must be positive")
-        if width * 9 != height * 16:
-            raise ValueError("output_size must use a 16:9 aspect ratio")
+        if output_size is not None and (
+            len(output_size) != 2 or any(type(value) is not int or value <= 0 for value in output_size)
+        ):
+            raise ValueError("output_size must contain two positive integers")
         if not 0 <= black_pixel_threshold <= 255:
             raise ValueError("black_pixel_threshold must be between 0 and 255")
         if not 0.0 <= black_ratio_threshold <= 1.0:
@@ -67,7 +68,8 @@ class PlaywrightBrowserCapture:
         self._page_call: Callable[[Callable[[Any], Any]], Any] | None = (
             page_or_call if callable(page_or_call) else lambda callback: callback(self.page)
         )
-        self._size = (width, height)
+        self._output_size = output_size
+        self._size = output_size or (0, 0)
         self._frame_lock = Lock()
         self.black_pixel_threshold = black_pixel_threshold
         self.black_ratio_threshold = black_ratio_threshold
@@ -117,10 +119,12 @@ class PlaywrightBrowserCapture:
         if page_call is None or not self.connected():
             return None
 
+        def screenshot_surface(page: Any) -> bytes:
+            bounds = BrowserRect.from_page(page)
+            return page.screenshot(type="png", full_page=False, scale="css", clip=asdict(bounds))
+
         try:
-            screenshot = page_call(
-                lambda page: page.screenshot(type="png", full_page=False)
-            )
+            screenshot = page_call(screenshot_surface)
         except Exception as exc:
             raise BrowserCaptureError(f"cannot capture cloud-game page: {exc}") from exc
 
@@ -133,7 +137,11 @@ class PlaywrightBrowserCapture:
             raise BrowserCaptureError("Playwright screenshot is not a decodable image")
 
         frame = self._as_bgr(decoded)
-        frame = self._normalize_16_9(frame)
+        if self._output_size is not None and frame.shape[1::-1] != self._output_size:
+            shrinking = frame.shape[1] > self._output_size[0] or frame.shape[0] > self._output_size[1]
+            interpolation = cv2.INTER_AREA if shrinking else cv2.INTER_LINEAR
+            frame = cv2.resize(frame, self._output_size, interpolation=interpolation)
+        self._size = frame.shape[1::-1]
         self._update_metrics(frame)
         return frame
 
@@ -160,33 +168,6 @@ class PlaywrightBrowserCapture:
             return cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
         raise BrowserCaptureError(f"unsupported screenshot channel count: {channels}")
 
-    def _normalize_16_9(self, frame: np.ndarray) -> np.ndarray:
-        source_height, source_width = frame.shape[:2]
-        if source_width <= 0 or source_height <= 0:
-            raise BrowserCaptureError("Playwright screenshot has invalid dimensions")
-
-        # Crop equally from opposite edges so browser chrome or letterboxing
-        # cannot distort the coordinate system expected by existing tasks.
-        if source_width * 9 > source_height * 16:
-            crop_width = source_height * 16 // 9
-            left = (source_width - crop_width) // 2
-            frame = frame[:, left : left + crop_width]
-        elif source_width * 9 < source_height * 16:
-            crop_height = source_width * 9 // 16
-            top = (source_height - crop_height) // 2
-            frame = frame[top : top + crop_height, :]
-
-        target_width, target_height = self._size
-        if frame.shape[1] != target_width or frame.shape[0] != target_height:
-            shrinking = frame.shape[1] > target_width or frame.shape[0] > target_height
-            interpolation = cv2.INTER_AREA if shrinking else cv2.INTER_LINEAR
-            frame = cv2.resize(
-                frame,
-                (target_width, target_height),
-                interpolation=interpolation,
-            )
-        return np.ascontiguousarray(frame)
-
     def _update_metrics(self, frame: np.ndarray) -> None:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         black_ratio = float(np.count_nonzero(gray <= self.black_pixel_threshold)) / float(
@@ -195,7 +176,7 @@ class PlaywrightBrowserCapture:
 
         difference_ratio: float | None = None
         is_static = False
-        if self._previous_gray is not None:
+        if self._previous_gray is not None and self._previous_gray.shape == gray.shape:
             difference = cv2.absdiff(gray, self._previous_gray)
             difference_ratio = float(np.mean(difference)) / 255.0
             is_static = difference_ratio <= self.static_difference_threshold

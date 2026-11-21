@@ -8,6 +8,35 @@ from extensions.cloud.ok_bridge import create_cloud_ok_class
 from src.task.DailyTask import DailyTask
 
 
+@pytest.mark.parametrize(("locale", "expected"), [
+    ("en_US", "Daily Task Completed"),
+    ("zh_CN", "每日任务已完成"),
+])
+def test_headless_daily_status_catalog(locale, expected):
+    from ok.core.translation import get_translations
+
+    assert get_translations(locale).gettext("Daily Task Completed") == expected
+
+
+@pytest.mark.parametrize(("points_text", "expected_points", "reward_ready"), [
+    ("0/100", 0, False),
+    ("60／100", 60, False),
+    ("100 / 100", 100, True),
+    ("120", 120, True),
+    (None, 0, False),
+])
+def test_daily_reward_readiness_uses_current_points(points_text, expected_points, reward_ready):
+    task = Mock()
+    task.get_total_daily_points.side_effect = lambda: DailyTask.get_total_daily_points(task)
+    task.ocr.side_effect = [
+        [SimpleNamespace(name="60/180")],
+        [SimpleNamespace(name=points_text)] if points_text else [],
+    ]
+
+    assert DailyTask.open_daily(task) == (60, reward_ready)
+    task.info_set.assert_called_with("total daily points", expected_points)
+
+
 def make_task():
     task = Mock()
     entry = SimpleNamespace(name="先约电台", x=920, y=200)

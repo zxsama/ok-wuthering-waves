@@ -26,12 +26,15 @@ def test_build_cloud_task_config_is_peripheral_and_does_not_mutate_source(monkey
         "gui": {"type": "qt"},
         "config_folder": "configs",
         "windows": {"exe": "game.exe", "start_exe": True},
+        "supported_resolution": {"ratio": "16:9", "min_size": (1280, 720)},
         "analytics": True,
     }
 
     result = build_cloud_task_config(source)
 
     assert source["windows"]["start_exe"] is True
+    assert source["supported_resolution"]["ratio"] == "16:9"
+    assert "supported_resolution" not in result
     assert "gui" not in result
     assert result["windows"] == {"exe": "game.exe", "start_exe": False}
     assert result["check_mutex"] is False

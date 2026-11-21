@@ -7,6 +7,7 @@ argument unless the container is granted broader privileges, which we avoid.
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -139,7 +140,7 @@ class DockerPlaywrightCloudPageAdapter(PlaywrightCloudPageAdapter):
         # the page under Playwright's persistent-context control. The URL is
         # supplied as an argv item, not through a shell, so no quoting step can
         # reinterpret it. Base open still navigates the selected page to the
-        # same URL after launch and retains the normalized 1280x720 viewport.
+        # same URL after launch with the task-compatible game viewport.
         original_launch_args = self.launch_args
         app_args = tuple(
             argument
@@ -185,7 +186,18 @@ class DockerPlaywrightCloudPageAdapter(PlaywrightCloudPageAdapter):
 
 
 def create_playwright_adapter() -> PlaywrightCloudPageAdapter:
+    screen = os.environ.get("CLOUD_SCREEN") or "1280x720x24"
+    match = re.fullmatch(r"([1-9]\d*)x([1-9]\d*)x[1-9]\d*", screen)
+    if match is None:
+        raise CloudPageError("CLOUD_SCREEN must be WIDTHxHEIGHTxDEPTH (for example 1920x1200x24)")
+    width, height = map(int, match.groups())
+    # Let the site and its streaming SDK lay out the game at the reference
+    # aspect from first navigation, while noVNC keeps the full Xvfb desktop.
+    units = min(width // 16, height // 9)
+    if units < 1:
+        raise CloudPageError("CLOUD_SCREEN must fit a 16:9 game viewport of at least 16x9")
     return DockerPlaywrightCloudPageAdapter(
+        viewport=(16 * units, 9 * units),
         ignore_default_args=(),
         launch_args=(
             "--deny-permission-prompts",
@@ -193,7 +205,7 @@ def create_playwright_adapter() -> PlaywrightCloudPageAdapter:
             "--kiosk",
             "--start-fullscreen",
             "--window-position=0,0",
-            "--window-size=1280,720",
+            f"--window-size={width},{height}",
             "--test-type",
             "--disable-infobars",
             "--disable-translate",

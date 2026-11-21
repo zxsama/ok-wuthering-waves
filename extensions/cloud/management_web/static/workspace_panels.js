@@ -23,6 +23,7 @@ export function mountPanel(host, api, page) {
   let mounted = true;
   let pending = null;
   let about = null;
+  let recordingHint = api.language?.startsWith("zh") ? "正在检查录制功能…" : "Checking recorder availability…";
   const update = async (group, field, value, section) => {
     if (pending) return;
     pending = group.name;
@@ -64,7 +65,7 @@ export function mountPanel(host, api, page) {
         panel = h(TaskTab, { ...editable, tab: page.tab });
         break;
       case "script":
-        panel = h(Scripts, { ...editable, initialScript: new URLSearchParams(location.search).get("file") });
+        panel = h(Scripts, { ...editable, recordingHint, initialScript: new URLSearchParams(location.search).get("file") });
         break;
       case "templates":
         panel = h(Templates, { notify: api.notify });
@@ -106,6 +107,17 @@ export function mountPanel(host, api, page) {
         panel,
       ),
     );
+  }
+  if (page.type === "script") {
+    api.get("/api/scripts-record/capabilities")
+      .then(({ available }) => {
+        recordingHint = available ? "" : (api.language?.startsWith("zh")
+          ? "录制需要 Windows 桌面录制器" : "Recording requires the Windows desktop recorder");
+      })
+      .catch(() => {
+        recordingHint = api.language?.startsWith("zh") ? "无法读取录制器状态" : "Could not check recorder availability";
+      })
+      .finally(() => { if (mounted) render(); });
   }
   if (page.type === "about") {
     api

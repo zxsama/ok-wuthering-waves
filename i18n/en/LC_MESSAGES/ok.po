@@ -1,0 +1,8 @@
+# English is the source language. Untranslated messages use their msgid.
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"

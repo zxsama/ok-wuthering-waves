@@ -2,6 +2,7 @@ import re
 
 from ok import BaseTask
 
+from extensions.rahai_input import drag_interaction
 from src.task.rahai_blocks import HEIGHT, WIDTH, canonical_frame, choose_move, clear_lines, preview_matches, read_board
 from src.task.task_icons import task_icon
 
@@ -18,7 +19,7 @@ class RahaiBlocksTask(BaseTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = "3.8 拉海洛方块·逆转"
-        self.description = "从活动关卡列表开始，挑战所有已解锁且未通关的关卡。请保持简体中文 PC 客户端在前台。"
+        self.description = "从简体中文的活动关卡列表开始，挑战所有已解锁且未通关的关卡。"
         self.group_name = "Daily Activities"
         self.group_icon = task_icon("category-daily")
         self.supported_languages = ["zh_CN"]
@@ -51,7 +52,7 @@ class RahaiBlocksTask(BaseTask):
 
     def _scroll_stages(self, interaction, direction, stages):
         if not interaction.clickable():
-            raise RuntimeError("请将鸣潮窗口保持在前台。")
+            raise RuntimeError("游戏画面暂时无法接收拖拽操作。")
         left = round(self.width * .34)
         right = round(self.width * .81)
         y = round(self.height * .49)
@@ -143,19 +144,10 @@ class RahaiBlocksTask(BaseTask):
 
     def run(self):
         self.next_frame()
-        if not self.hwnd or not self.hwnd.exists or canonical_frame(self.frame) is None:
-            raise RuntimeError("拉海洛方块需要 16:9 的 Windows PC 客户端。")
         stages = self.wait_until(self._stage_list, time_out=5)
         if not stages:
             raise RuntimeError("请先打开简体中文的「拉海洛方块·逆转」活动关卡列表。")
-        # Native input is only needed after the Windows client checks pass.
-        from ok.device.interaction_methods.pynput import PynputInteraction
-
-        interaction = PynputInteraction(self.executor.device_manager.capture_method, self.hwnd)
-        if not interaction.clickable():
-            self.hwnd.bring_to_front()
-            if not self.wait_until(interaction.clickable, time_out=3):
-                raise RuntimeError("请将鸣潮窗口切到前台后再次启动任务。")
+        interaction = drag_interaction(self)
 
         stages = self._first_page(interaction, stages)
         attempted = set()
@@ -284,16 +276,12 @@ class RahaiBlocksTask(BaseTask):
                 self.screenshot("rahai_preview_mismatch")
             return release_at_target
         finally:
-            if interaction.clickable():
-                if not release_at_target:
+            try:
+                if not release_at_target and interaction.clickable():
                     # No task sleep here: cancellation must still release the button.
                     interaction.move(*point(source))
+            finally:
                 interaction.mouse_up()
-            else:
-                # PynputInteraction.mouse_up deliberately skips when not focused.
-                # Release our already-held button even if the focus changed.
-                from pynput import mouse
-                mouse.Controller().release(mouse.Button.left)
 
     def _play_board(self, interaction):
         misses = 0

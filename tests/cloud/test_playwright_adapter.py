@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from concurrent.futures import Future
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from queue import Queue
 from threading import Event, Thread, get_ident
@@ -219,6 +219,38 @@ def test_open_page_calls_and_close_share_one_owner_thread(tmp_path):
     assert set(page.call_threads) == {owner_thread}
     assert context.close_thread == owner_thread
     assert playwright.stop_thread == owner_thread
+
+
+def test_close_during_navigation_releases_browser_and_allows_reopen(tmp_path, monkeypatch):
+    navigating = Event()
+    closing = Event()
+    page = FakePage()
+    adapter, chromium, _ = make_open_adapter(page)
+    original_goto = page.goto
+    begin_close = adapter._begin_close
+
+    def wait_for_close(*args, **kwargs):
+        navigating.set()
+        assert closing.wait(timeout=2)
+        return original_goto(*args, **kwargs)
+
+    def signal_close():
+        result = begin_close()
+        closing.set()
+        return result
+
+    monkeypatch.setattr(page, "goto", wait_for_close)
+    monkeypatch.setattr(adapter, "_begin_close", signal_close)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        opening = pool.submit(adapter.open, url="http://localhost/", profile_dir=tmp_path, visible=False)
+        assert navigating.wait(timeout=2)
+        adapter.close()
+        with pytest.raises(CloudPageError, match="closed while opening"):
+            opening.result(timeout=2)
+
+    assert chromium.context.close_thread == chromium.launch_threads[0]
+    adapter.open(url="http://localhost/", profile_dir=tmp_path, visible=False)
+    adapter.close()
 
 
 def test_call_page_keeps_attach_page_compatible():

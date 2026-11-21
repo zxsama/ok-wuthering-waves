@@ -1,5 +1,7 @@
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import cv2
 import numpy as np
@@ -87,6 +89,53 @@ class TestRahaiBlocks(unittest.TestCase):
         self.assertIsNotNone(board)
         self.assertEqual([(piece.slot, len(piece.cells)) for piece in board.pieces], [(0, 9), (1, 4), (2, 5)])
 
-    def test_unrelated_and_non_widescreen_frames_are_rejected(self):
+    def test_unrelated_or_empty_frames_are_rejected(self):
         self.assertIsNone(read_board(canonical_frame(np.zeros((720, 1280, 3), np.uint8))))
-        self.assertIsNone(canonical_frame(np.zeros((720, 1440, 3), np.uint8)))
+        self.assertIsNone(canonical_frame(np.empty((0, 1280, 3), np.uint8)))
+        self.assertIsNone(canonical_frame(None))
+
+    def test_scaled_event_board_and_drop_preview_at_different_aspect_ratios(self):
+        from src.task.RahaiBlocksTask import RahaiBlocksTask
+
+        original = fixture('score')
+        preview = fixture('preview')
+        for size in ((1600, 1200), (1920, 800)):
+            with self.subTest(size=size):
+                game_frame = cv2.resize(original, size)
+                board = read_board(canonical_frame(game_frame))
+                self.assertEqual(board.mask, 27026459673497112)
+                move = choose_move(board)
+                self.assertEqual((move.slot, move.row, move.col), (0, 2, 5))
+                task = Mock(frame=game_frame)
+                task.next_frame.return_value = cv2.resize(preview, size)
+                interaction = Mock()
+                self.assertTrue(RahaiBlocksTask._place(task, interaction, board, move))
+                x, y = board.pieces[0].pickup
+                interaction.mouse_down.assert_called_once_with(
+                    round(x * size[0] / original.shape[1]), round(y * size[1] / original.shape[0])
+                )
+                interaction.mouse_up.assert_called_once_with()
+
+    def test_task_scans_with_browser_drag_input_without_a_window(self):
+        from src.task.RahaiBlocksTask import RahaiBlocksTask
+
+        drag = Mock()
+        manager = SimpleNamespace(drag_interaction=drag, hwnd_window=None)
+        task = Mock(executor=SimpleNamespace(device_manager=manager))
+        stage = [(Mock(), SimpleNamespace(name='已通关'))]
+        task.wait_until.return_value = stage
+        task._first_page.return_value = stage
+        task._scroll_stages.return_value = (stage, False)
+        RahaiBlocksTask.run(task)
+        task._scroll_stages.assert_called_once_with(drag, 1, stage)
+
+    def test_drag_releases_button_when_session_loses_focus(self):
+        from src.task.RahaiBlocksTask import RahaiBlocksTask
+
+        frame = fixture('score')
+        board = read_board(frame)
+        interaction = Mock()
+        interaction.clickable.side_effect = [True, False, False]
+        with self.assertRaisesRegex(RuntimeError, 'drag'):
+            RahaiBlocksTask._place(Mock(frame=frame), interaction, board, choose_move(board))
+        interaction.mouse_up.assert_called_once_with()

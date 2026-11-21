@@ -496,6 +496,7 @@ class WebRuntime:
         self._schedule_manager = None
         self._template_store = None
         self._pyappify_update_lock = threading.Lock()
+        self.task_config_lock = threading.RLock()
         self.event_session_key = secrets.token_urlsafe(32)
 
     @property
@@ -990,7 +991,14 @@ class WebRuntime:
         manager = self.task_manager
         matching_task = next((task for task, data in manager.task_map.items() if Path(data[0]).resolve() == path), None)
         if matching_task is not None:
-            manager.reload_task_code(matching_task)
+            job = manager.reload_task_code(matching_task)
+            try:
+                job.future.result(timeout=30)
+            except TimeoutError:
+                job.cancel()
+                return {**self.read_script(name), "error": "Timed out waiting for task reload"}
+            except Exception as exc:
+                return {**self.read_script(name), "error": str(exc) or type(exc).__name__}
         else:
             manager.load_single_user_task(str(path))
         error = manager.task_errors.get(str(path)) or manager.task_errors.get(path)
@@ -1060,8 +1068,7 @@ class WebRuntime:
         task = next((task for task, data in manager.task_map.items() if Path(data[0]).resolve() == path), None)
         if task is None:
             raise RuntimeError("Task could not be loaded")
-        if not self.ok.headless_app.start_controller.do_start(task):
-            raise RuntimeError("Start task failed")
+        self.start_task(f"{type(task).__module__}.{type(task).__name__}")
         return document
 
     def script_export_options(self):
@@ -1100,8 +1107,25 @@ class WebRuntime:
         finally:
             temporary.unlink(missing_ok=True)
 
+    def script_recorder(self):
+        if not callable(getattr(self.device_manager, "get_hwnd_name", None)):
+            return None
+        try:
+            from ok.ui.qt.tasks.RecordScript import recorder
+        except (ImportError, OSError):
+            return None
+        return recorder
+
+    def _require_script_recorder(self):
+        from fastapi import HTTPException
+
+        recorder = self.script_recorder()
+        if recorder is None:
+            raise HTTPException(501, "Script recording requires the Windows desktop recorder")
+        return recorder
+
     def start_script_recording(self):
-        from ok.ui.qt.tasks.RecordScript import recorder
+        recorder = self._require_script_recorder()
         if recorder.is_recording:
             return {"recording": True}
         target = self.device_manager.get_hwnd_name()
@@ -1109,7 +1133,7 @@ class WebRuntime:
         return {"recording": True, "target": target}
 
     def stop_script_recording(self, source="", loop="none", count=1):
-        from ok.ui.qt.tasks.RecordScript import recorder
+        recorder = self._require_script_recorder()
         if not recorder.is_recording:
             raise RuntimeError("Recording is not active")
         init_code, run_code = recorder.stop()
@@ -1319,18 +1343,20 @@ class WebRuntime:
 
     def set_task_config(self, name, key, value):
         task, _is_trigger = self.ok.get_task(name)
-        if key.startswith("_") or key not in task.config:
-            raise ValueError(f"Unknown task config: {key}")
-        previous = task.config.get(key)
-        task.config[key] = value
-        if task.config.get(key) == previous and value != previous:
-            raise ValueError(f"Invalid value for {key}")
-        return _task_payload(task)
+        with self.task_config_lock:
+            if key.startswith("_") or key not in task.config:
+                raise ValueError(f"Unknown task config: {key}")
+            previous = task.config.get(key)
+            task.config[key] = value
+            if task.config.get(key) == previous and value != previous:
+                raise ValueError(f"Invalid value for {key}")
+            return _task_payload(task)
 
     def reset_task_config(self, name):
         task, _is_trigger = self.ok.get_task(name)
-        task.config.reset_to_default()
-        return _task_payload(task)
+        with self.task_config_lock:
+            task.config.reset_to_default()
+            return _task_payload(task)
 
     def pause(self):
         if not self.executor.paused:
@@ -1615,6 +1641,10 @@ def create_web_app(config, ok_instance=None):
             return await asyncio.to_thread(runtime.import_script_archive, request.headers.get("x-file-name", ""), content)
         except (ValueError, RuntimeError, OSError, zipfile.BadZipFile) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/scripts-record/capabilities")
+    def script_recording_capabilities():
+        return {"available": runtime.script_recorder() is not None}
 
     @app.post("/api/scripts-record/start")
     async def start_script_recording():

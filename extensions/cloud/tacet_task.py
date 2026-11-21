@@ -13,7 +13,7 @@ _PROMPT_TIMEOUT_SECONDS = 5
 def walk_to_treasure(
     task: Any, send_f: bool = True, raise_if_not_found: bool = True
 ) -> None:
-    from ok.task.exceptions import CannotFindException
+    from ok.task.exceptions import WaitFailedException
     from src.task.BaseWWTask import BaseWWTask
 
     for attempt in range(1, _APPROACH_ATTEMPTS + 1):
@@ -39,7 +39,7 @@ def walk_to_treasure(
 
     message = f"cannot find reward F prompt after {_APPROACH_ATTEMPTS} cloud approaches"
     if raise_if_not_found:
-        raise CannotFindException(message)
+        raise WaitFailedException(message)
     task.log_warning(message)
 
 

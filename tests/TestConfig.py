@@ -1,9 +1,27 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+import numpy as np
+from ok.task.TaskExecutor import TaskExecutor
 
 import config
+
+
+class TestDisplayConfig(unittest.TestCase):
+
+    def test_hud_reference_does_not_trigger_window_resize(self):
+        display = config.config['supported_resolution']
+        self.assertEqual(display['ratio'], '16:9')
+        self.assertFalse(display.get('resize_to'))
+        for width, height in ((1920, 1200), (2560, 1080)):
+            with self.subTest(width=width, height=height):
+                frame = np.zeros((height, width, 3), dtype=np.uint8)
+                supported, _ = TaskExecutor.check_frame_and_resolution(
+                    Mock(spec=TaskExecutor), display['ratio'], display.get('min_size'), frame=frame,
+                )
+                self.assertTrue(supported)
 
 
 class TestCalculatePcExePath(unittest.TestCase):

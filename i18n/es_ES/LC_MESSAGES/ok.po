@@ -212,12 +212,6 @@ msgstr ""
 "La hora local de tu ordenador en la que aparecerá la tarjeta mensual, hora "
 "en (1-24)"
 
-msgid ""
-"must be in game world and in teams, please check you game resolution is 16:9"
-msgstr ""
-"Debes estar en el mundo del juego y en equipo, por favor comprueba que la "
-"resolución de tu juego es 16:9"
-
 msgid "Capture Frame Count"
 msgstr "Número de Capturas de Fotogramas"
 
@@ -341,13 +335,6 @@ msgstr "Lorelei"
 
 msgid "click f2 to open the book"
 msgstr "haz clic en F2 para abrir el libro"
-
-msgid ""
-"Check configs to keep, click start in game world, must be in a 16:9 screen "
-"ratio"
-msgstr ""
-"Comprueba las configuraciones a mantener, haz clic en iniciar en el mundo "
-"del juego, debe estar en una relación de pantalla de 16:9"
 
 msgid "Boss"
 msgstr "Jefe"
@@ -1056,11 +1043,8 @@ msgstr ""
 "Pulsa B para abrir la mochila, selecciona en el filtro los Ecos que quieras "
 "mejorar y ordénalos por nivel desde 0 antes de comenzar."
 
-msgid "游戏与okww语言必须为简体/繁体中文,必须16:9分辨率,使用1600x900以上分辨率, 勾选需要的, 没勾的都会自动合成"
-msgstr ""
-"El juego y okww deben estar en chino simplificado/tradicional; se requiere "
-"una resolución 16:9 de al menos 1600x900. Marca lo que quieras conservar; lo"
-" no marcado se fusionará automáticamente."
+msgid "游戏与 okww 语言须为简体或繁体中文，分辨率至少为 1600×900。勾选需要保留的声骸，未勾选的会自动合成。"
+msgstr "Configura el juego y okww en chino simplificado o tradicional y usa una resolución de al menos 1600×900. Marca los Ecos que quieras conservar. Los demás se fusionarán automáticamente."
 
 msgid "Switch to Healer before and after Combat"
 msgstr "Cambiar al sanador antes y después del combate"

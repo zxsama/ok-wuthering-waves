@@ -10,6 +10,7 @@ from collections import deque
 from pathlib import Path
 
 from fastapi import HTTPException, Query, Response
+from ok.device.capture_methods.base import CAPTURE_BUSY_WAIT
 
 from .app import LOG_LEVELS, LOG_LINE_PATTERN
 
@@ -170,7 +171,6 @@ def _thread_snapshot():
 
 def _capture(runtime, folder):
     from ok.core.screenshot import screenshot_file_stem
-    from ok.device.capture import CAPTURE_BUSY_WAIT
 
     method = runtime.device_manager.capture_method
     frame = method.get_frame(busy_wait=CAPTURE_BUSY_WAIT) if method is not None else None

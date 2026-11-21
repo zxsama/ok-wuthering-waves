@@ -1,4 +1,5 @@
 import asyncio
+import json
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -77,6 +78,7 @@ def make_runtime(task):
     stops = []
     closes = []
     runtime = SimpleNamespace()
+    runtime.task_config_lock = threading.RLock()
     runtime.executor = SimpleNamespace(paused=True)
     runtime.ok = SimpleNamespace(get_task=lambda identifier: (task, False))
     runtime.start = lambda: starts_runtime.append(True) or True
@@ -632,6 +634,134 @@ def test_second_task_is_rejected_until_first_finishes():
 
     with pytest.raises(RuntimeError, match="already running"):
         controller.start_task("ForgeryTask")
+
+
+@pytest.fixture
+def cloud_trigger(tmp_path, monkeypatch):
+    from ok.core.events import communicate
+    from ok.util.config import Config
+    from extensions.cloud.management_web.app import WebRuntime
+    from src.task.MouseResetTask import MouseResetTask
+
+    session = FakeSession()
+    runtime, *_ = make_runtime(None)
+    executor = runtime.executor
+    executor.scene = None
+    executor.onetime_tasks = []
+    calls = []
+    executor.interaction = SimpleNamespace(on_run=lambda: calls.append("on_run"))
+    executor.enqueue_onetime_task = lambda _task: calls.append("enqueue")
+    executor.remove_onetime_task = lambda _task: calls.append("remove")
+    executor._wake_executor = lambda: calls.append("wake")
+    task = MouseResetTask(executor, None)
+    monkeypatch.setattr(Config, "config_folder", str(tmp_path))
+    task.default_config = {"_enabled": False}
+    task.after_init()
+    executor.trigger_tasks = [task]
+    task.run = lambda: calls.append("run")
+    task.ensure_capture = lambda: calls.append("capture")
+    runtime.ok.get_task = lambda name: (task, True)
+    runtime.task_action = WebRuntime.task_action.__get__(runtime)
+    controller = CloudWebController(runtime, session, FakeProfile(True), task_state_signal=communicate.task)
+    controller.install()
+    events = []
+    with communicate.task.subscribed(lambda changed: events.append(changed.enabled)):
+        try:
+            yield runtime, task, session, calls, events
+        finally:
+            communicate.task.disconnect(controller._on_task_state_changed)
+
+
+@pytest.mark.parametrize(("state", "paused", "page_closed"), [
+    ("closed", False, False), ("queueing", False, False),
+    ("in_game", True, False), ("in_game", False, True),
+])
+def test_idle_trigger_enable_persists_and_restores_without_running(cloud_trigger, state, paused, page_closed):
+    from ok.task.TaskExecutor import TaskExecutor
+
+    runtime, task, session, calls, events = cloud_trigger
+    session.state, session.page_closed = state, page_closed
+    runtime.executor.paused = paused
+    task._enabled = True  # State left by a previous failed upstream enable.
+
+    assert runtime.task_action(task.name, "enable")["enabled"] is True
+    assert calls == []
+    assert events == [True]
+    restored = type(task)(runtime.executor, None)
+    restored.default_config = task.default_config
+    restored.after_init()
+    assert restored.enabled and restored.config["_enabled"]
+    executor = runtime.executor
+    executor.trigger_tasks = [restored]
+    executor.trigger_task_index = -1
+    executor.onetime_task_queue = []
+    executor.exit_event = threading.Event()
+    executor.lock = threading.Lock()
+    assert TaskExecutor.next_task(executor)[0] is restored
+
+    assert runtime.task_action(task.name, "disable")["enabled"] is False
+    assert events == [True, False]
+    assert json.loads(Path(task.config.config_file).read_text())["_enabled"] is False
+
+
+def test_in_game_trigger_uses_regular_enable_and_rolls_back_failure(cloud_trigger):
+    runtime, task, session, calls, events = cloud_trigger
+    session.state = "in_game"
+    runtime.executor.paused = False
+    with pytest.MonkeyPatch.context() as patch:
+        def fail():
+            raise RuntimeError("input unavailable")
+        patch.setattr(runtime.executor.interaction, "on_run", fail)
+        with pytest.raises(RuntimeError, match="input unavailable"):
+            runtime.task_action(task.name, "enable")
+    assert task.enabled is False and task.config["_enabled"] is False
+    assert json.loads(Path(task.config.config_file).read_text())["_enabled"] is False
+    assert events == [False]
+    assert runtime.task_action(task.name, "enable")["enabled"] is True
+    assert calls == ["capture", "capture", "on_run", "enqueue", "run"]
+    assert events == [False, True]
+
+
+def test_trigger_save_failure_leaves_memory_and_file_intact(cloud_trigger, monkeypatch):
+    runtime, task, _session, calls, events = cloud_trigger
+    def deny_replace(*_args):
+        raise PermissionError("read only")
+    monkeypatch.setattr("extensions.cloud.web_service.os.replace", deny_replace)
+    with pytest.raises(RuntimeError, match="read only"):
+        runtime.task_action(task.name, "enable")
+    assert not task.enabled and not task.config["_enabled"]
+    assert json.loads(Path(task.config.config_file).read_text())["_enabled"] is False
+    assert calls == events == []
+
+
+def test_concurrent_trigger_disable_follows_in_progress_enable(cloud_trigger):
+    from concurrent.futures import ThreadPoolExecutor
+
+    runtime, task, session, _calls, events = cloud_trigger
+    session.state = "in_game"
+    runtime.executor.paused = False
+    entered, release, disabling = threading.Event(), threading.Event(), threading.Event()
+
+    def hold_input():
+        entered.set()
+        assert release.wait(3)
+
+    def disable():
+        disabling.set()
+        return runtime.task_action(task.name, "disable")
+
+    runtime.executor.interaction.on_run = hold_input
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(runtime.task_action, task.name, "enable")
+        assert entered.wait(3)
+        second = pool.submit(disable)
+        assert disabling.wait(3)
+        release.set()
+        assert first.result()["enabled"] is True
+        assert second.result()["enabled"] is False
+    assert events == [True, False]
+    assert not task.enabled and not task.config["_enabled"]
+    assert json.loads(Path(task.config.config_file).read_text())["_enabled"] is False
 
 
 def test_stopping_a_task_closes_only_the_game_session():

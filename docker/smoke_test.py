@@ -23,6 +23,7 @@ from docker.playwright_adapter import create_playwright_adapter
 from extensions.cloud.task_runner import create_daily_task_runner
 from extensions.cloud.web_service import create_cloud_web_app
 from extensions.cloud.management_web.app import create_web_app
+from extensions.cloud.management_web.desktop_tools import register_desktop_tools
 from extensions.cloud.character_code_task import CloudCharacterCodeTask
 from src.task.DailyTask import DailyTask
 from src.task.MouseResetTask import MouseResetTask
@@ -35,6 +36,7 @@ assert openvino.__version__
 assert onnxocr
 assert fastapi and uvicorn and callable(create_cloud_web_app)
 assert callable(create_web_app) and CloudCharacterCodeTask.web_tab.id == "character-code"
+assert callable(register_desktop_tools)
 assert (
     OK
     and BaseCaptureMethod

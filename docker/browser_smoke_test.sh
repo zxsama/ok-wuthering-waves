@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-Xvfb :99 -screen 0 1280x720x24 -nolisten tcp >/tmp/xvfb-smoke.log 2>&1 &
+Xvfb :99 -screen 0 "${CLOUD_SCREEN:-1280x720x24}" -nolisten tcp >/tmp/xvfb-smoke.log 2>&1 &
 xvfb_pid=$!
 openbox_pid=
 trap 'if [ -n "$openbox_pid" ]; then kill "$openbox_pid" 2>/dev/null || true; fi; kill "$xvfb_pid" 2>/dev/null || true' EXIT

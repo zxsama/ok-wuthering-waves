@@ -57,10 +57,15 @@ bridge. On Windows, the default runner connects the active cloud tab to the repo
 .\.venv\Scripts\python.exe -m extensions.cloud run-once
 ```
 
-The bridge keeps synchronous Playwright on a dedicated owner thread. Existing
-tasks receive normalized 1280×720 BGR frames and their keyboard/mouse calls are
-dispatched back to that same thread. A custom one-time flow can still be supplied
-with `--task-runner package.module:create_task_runner`.
+The bridge keeps synchronous Playwright on a dedicated owner thread. Tasks
+receive BGR frames of the visible game content, or the page viewport when no
+player is visible. Mouse coordinates map back to the same content bounds.
+Docker uses `CLOUD_SCREEN` for the Xvfb / noVNC desktop (default `1280x720x24`).
+Chrome opens every cloud session with the largest exact 16:9 viewport that fits
+that desktop. The streaming SDK sees the same dimensions in `window.screen`
+and lays out the game before tasks start. A 1600×1000 desktop gives the game
+1600×900 CSS pixels. The physical host display can use any aspect ratio.
+A custom one-time flow can be supplied with `--task-runner package.module:create_task_runner`.
 
 Runs sharing a data directory also share an `execution.lock`. This prevents a
 manual enrollment or `run-once` process from opening the persistent browser

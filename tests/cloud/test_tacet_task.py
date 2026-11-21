@@ -2,7 +2,7 @@ from types import MethodType, SimpleNamespace
 from unittest.mock import Mock, call
 
 import pytest
-from ok.task.exceptions import CannotFindException, TaskDisabledException
+from ok.task.exceptions import TaskDisabledException, WaitFailedException
 
 from extensions.cloud.ok_bridge import create_cloud_ok_class
 from extensions.cloud.tacet_task import install_tacet_task_support, walk_to_treasure
@@ -39,11 +39,24 @@ def test_lost_prompt_repositions_then_returns_when_f_is_visible(monkeypatch, mis
 def test_all_missing_prompts_stop_after_ten_approaches(monkeypatch):
     task, approach = approach_scenario(monkeypatch, [None] * 10)
 
-    with pytest.raises(CannotFindException, match="after 10 cloud approaches"):
+    with pytest.raises(WaitFailedException, match="after 10 cloud approaches"):
         walk_to_treasure(task)
 
     assert approach.call_count == 10
     assert task.wait_until.call_count == 10
+
+
+def test_exhausted_cloud_approaches_resume_combat_in_the_same_arena(monkeypatch):
+    task, approach = approach_scenario(monkeypatch, [None] * 10 + [True])
+    task.walk_to_treasure = MethodType(walk_to_treasure, task)
+    task.in_realm.return_value = True
+    task.wait_combat.return_value = True
+
+    TacetTask.clear_tacet_and_reach_reward(task)
+
+    task.wait_combat.assert_called_once_with(target=True, time_out=5, raise_if_not_found=False)
+    assert task.combat_once.call_args_list == [call(target=True), call(target=True, wait_combat_time=5)]
+    assert approach.call_count == 11
 
 
 def test_optional_prompt_failure_keeps_nonraising_behavior(monkeypatch):

@@ -20,13 +20,18 @@ class FakePage:
         frames: list[bytes | Exception],
         *,
         closed: bool = False,
+        viewport: tuple[int, int] = (160, 90),
     ):
         self.frames = list(frames)
         self.closed = closed
+        self.viewport = viewport
         self.screenshot_calls: list[dict[str, object]] = []
 
     def is_closed(self):
         return self.closed
+
+    def evaluate(self, _script):
+        return (0, 0, *self.viewport)
 
     def screenshot(self, **kwargs):
         self.screenshot_calls.append(kwargs)
@@ -42,10 +47,10 @@ def png(frame: np.ndarray) -> bytes:
     return data.tobytes()
 
 
-def test_capture_returns_fixed_16_9_bgr_frame_from_page_screenshot():
+def test_capture_resizes_to_explicit_frame_size_in_css_pixels():
     source = np.zeros((100, 200, 4), dtype=np.uint8)
     source[:, 20:180] = (11, 22, 233, 255)
-    page = FakePage([png(source)])
+    page = FakePage([png(source)], viewport=(200, 100))
     capture = PlaywrightBrowserCapture(page, output_size=(160, 90))
 
     frame = capture.get_frame()
@@ -54,7 +59,10 @@ def test_capture_returns_fixed_16_9_bgr_frame_from_page_screenshot():
     assert frame.shape == (90, 160, 3)
     assert frame.flags.c_contiguous
     assert tuple(frame[45, 80]) == (11, 22, 233)
-    assert page.screenshot_calls == [{"type": "png", "full_page": False}]
+    assert page.screenshot_calls == [{
+        "type": "png", "full_page": False, "scale": "css",
+        "clip": {"x": 0, "y": 0, "width": 200, "height": 100},
+    }]
     assert capture.width == 160
     assert capture.height == 90
 
@@ -97,18 +105,17 @@ def test_capture_contention_honors_busy_wait_and_releases_after_failure():
         assert np.array_equal(waiting.result(timeout=3), frame)
 
 
-def test_tall_screenshot_is_center_cropped_before_resizing():
+def test_tall_frame_keeps_top_and_bottom_edges_at_native_resolution():
     source = np.zeros((200, 160, 3), dtype=np.uint8)
-    source[55:145, :] = (10, 180, 30)
-    capture = PlaywrightBrowserCapture(
-        FakePage([png(source)]), output_size=(160, 90)
-    )
+    source[:10, :] = (10, 180, 30)
+    source[-10:, :] = (150, 80, 200)
+    capture = PlaywrightBrowserCapture(FakePage([png(source)], viewport=(160, 200)))
 
     frame = capture.do_get_frame()
 
     assert frame is not None
-    assert frame.shape == (90, 160, 3)
-    assert tuple(frame[45, 80]) == (10, 180, 30)
+    assert np.array_equal(frame, source)
+    assert (capture.width, capture.height) == (160, 200)
 
 
 def test_black_and_static_metrics_are_updated_for_each_frame():
@@ -161,9 +168,9 @@ def test_closed_page_returns_none_and_close_does_not_close_owned_page():
 
 @pytest.mark.parametrize(
     "output_size",
-    [(0, 720), (1280, 0), (100, 100)],
+    [(0, 720), (1280, 0), (-1, 100)],
 )
-def test_output_size_must_be_positive_16_9(output_size):
+def test_output_size_must_be_positive(output_size):
     with pytest.raises(ValueError):
         PlaywrightBrowserCapture(FakePage([]), output_size=output_size)
 

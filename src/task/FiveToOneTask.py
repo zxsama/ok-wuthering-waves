@@ -14,7 +14,7 @@ class FiveToOneTask(BaseCombatTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.description = "游戏与okww语言必须为简体/繁体中文,必须16:9分辨率,使用1600x900以上分辨率, 勾选需要的, 没勾的都会自动合成"
+        self.description = "游戏与 okww 语言须为简体或繁体中文，分辨率至少为 1600×900。勾选需要保留的声骸，未勾选的会自动合成。"
         self.name = "♻️ 数据坞五合一"
         self.icon = task_icon('synthesis')
         self.default_config = {

@@ -203,10 +203,6 @@ msgid ""
 "Your computer's local time when the monthly card will popup, hour in (1-24)"
 msgstr "几点会弹出月卡提示, 本地计算机时间(1-24)"
 
-msgid ""
-"must be in game world and in teams, please check you game resolution is 16:9"
-msgstr "必须在大世界队伍中, 请点击截图测试,检查游戏分辨率是否是16:9"
-
 msgid "Capture Frame Count"
 msgstr "截图次数"
 
@@ -322,11 +318,6 @@ msgstr "罗蕾莱"
 
 msgid "click f2 to open the book"
 msgstr "点击F2打开书"
-
-msgid ""
-"Check configs to keep, click start in game world, must be in a 16:9 screen "
-"ratio"
-msgstr "必须16:9分辨率, 没有勾选的都会标记为弃置, 大世界启动"
 
 msgid "Boss"
 msgstr ""
@@ -1179,8 +1170,8 @@ msgstr "点击B进入背包，在过滤器中选择需要修改主属性的声�
 msgid "点击B进入背包, 在过滤器中选择需要强化的声骸, 并按照等级从0排序后开始."
 msgstr "点击B进入背包，在过滤器中选择需要强化的声骸，并按等级从0开始排序后运行。"
 
-msgid "游戏与okww语言必须为简体/繁体中文,必须16:9分辨率,使用1600x900以上分辨率, 勾选需要的, 没勾的都会自动合成"
-msgstr "游戏与okww语言必须为简体/繁体中文，分辨率必须为16:9且不低于1600x900。勾选需要保留的声骸，未勾选的会自动合成。"
+msgid "游戏与 okww 语言须为简体或繁体中文，分辨率至少为 1600×900。勾选需要保留的声骸，未勾选的会自动合成。"
+msgstr "游戏与 okww 语言须为简体或繁体中文，分辨率至少为 1600×900。勾选需要保留的声骸，未勾选的会自动合成。"
 
 msgid "Author"
 msgstr "作者"

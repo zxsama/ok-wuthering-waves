@@ -137,7 +137,7 @@ class PlaywrightCloudPageAdapter:
                 daemon=True,
             )
             self._owner_thread = owner
-        owner.start()
+            owner.start()
         try:
             ready.result(timeout=self.owner_open_timeout_seconds)
         except FutureTimeoutError as exc:
@@ -163,7 +163,6 @@ class PlaywrightCloudPageAdapter:
         terminal_error: BaseException = CloudPageError(
             "cloud browser owner thread stopped"
         )
-        close_result: Future[Any] | None = None
         try:
             try:
                 self._open_resources(url=url, profile_dir=profile_dir, visible=visible)
@@ -185,7 +184,6 @@ class PlaywrightCloudPageAdapter:
             while True:
                 callback, result = queue.get()
                 if callback is None:
-                    close_result = result
                     break
                 try:
                     self._set_future_result(result, callback())
@@ -197,22 +195,26 @@ class PlaywrightCloudPageAdapter:
         finally:
             with self._owner_lock:
                 self._closing = True
+            close_error = None
             try:
                 self._close_resources()
             except BaseException as exc:
                 terminal_error = exc
-                if close_result is not None:
-                    self._set_future_exception(close_result, exc)
-            else:
-                if close_result is not None:
-                    self._set_future_result(close_result, None)
-            self._fail_pending_owner_calls(queue, terminal_error)
+                close_error = exc
             with self._owner_lock:
+                close_result = self._close_future
                 if self._owner_thread is current_thread():
                     self._owner_thread = None
                     self._owner_queue = None
                     self._close_future = None
                     self._closing = False
+            # Shutdown can finish during open(), before the queue is consumed.
+            if close_result is not None:
+                if close_error is None:
+                    self._set_future_result(close_result, None)
+                else:
+                    self._set_future_exception(close_result, close_error)
+            self._fail_pending_owner_calls(queue, terminal_error)
 
     def _open_resources(self, *, url: str, profile_dir: Path, visible: bool) -> None:
         playwright = self._start_playwright()

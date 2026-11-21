@@ -203,10 +203,6 @@ msgid ""
 "Your computer's local time when the monthly card will popup, hour in (1-24)"
 msgstr "月卡提示彈出的時間，本地電腦時間(1-24小時制)"
 
-msgid ""
-"must be in game world and in teams, please check you game resolution is 16:9"
-msgstr "必須在遊戲世界隊伍中，請點擊截圖測試，檢查遊戲解析度是否為16:9"
-
 msgid "Capture Frame Count"
 msgstr "截圖次數"
 
@@ -322,11 +318,6 @@ msgstr "羅蕾萊"
 
 msgid "click f2 to open the book"
 msgstr "點擊F2開啟指南"
-
-msgid ""
-"Check configs to keep, click start in game world, must be in a 16:9 screen "
-"ratio"
-msgstr "必須為16:9解析度，未勾選的項目將被標記為棄置，請在遊戲世界中啟動"
 
 msgid "Boss"
 msgstr "Boss"
@@ -1130,8 +1121,8 @@ msgstr "如果開啟，第一個副詞條必須在有效詞條列表中且符合
 msgid "定义哪些属性被视为有效"
 msgstr "定義哪些屬性被視為有效"
 
-msgid "游戏与okww语言必须为简体/繁体中文,必须16:9分辨率,使用1600x900以上分辨率, 勾选需要的, 没勾的都会自动合成"
-msgstr "遊戲與okww語言必須為簡體/繁體中文,必須16:9解析度,使用1600x900以上解析度, 勾選需要的, 沒勾的都會自動合成"
+msgid "游戏与 okww 语言须为简体或繁体中文，分辨率至少为 1600×900。勾选需要保留的声骸，未勾选的会自动合成。"
+msgstr "遊戲與 okww 語言須為簡體或繁體中文，解析度至少為 1600×900。勾選需要保留的聲骸，未勾選的會自動合成。"
 
 msgid "数据坞五合一"
 msgstr "資料塢五合一"
