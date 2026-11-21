@@ -6,6 +6,10 @@ services:
     secrets:
       - source: smtp_password
         target: smtp_password
+  auto-updater:
+    environment:
+      CLOUD_UPDATE_SMTP_OVERLAY: /workspace/compose.smtp.yaml
+      OK_WW_SMTP_PASSWORD_SOURCE: ${OK_WW_SMTP_PASSWORD_SOURCE:?Set OK_WW_SMTP_PASSWORD_SOURCE to the SMTP password file}
 
 secrets:
   smtp_password:

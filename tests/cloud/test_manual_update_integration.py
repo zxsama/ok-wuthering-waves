@@ -4,6 +4,7 @@ import json
 import os
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.request
@@ -66,6 +67,20 @@ def _wsl_path(path: Path) -> str:
     ).stdout.strip()
 
 
+@pytest.fixture
+def updater_dir(tmp_path: Path):
+    if os.name != "nt":
+        yield tmp_path
+        return
+    if not (Path(os.environ["SystemRoot"]) / "System32/wsl.exe").exists():
+        pytest.skip("WSL is required to run the POSIX updater script on Windows")
+    # The production control volume has POSIX rename semantics. A Windows
+    # read handle on /mnt/c can prevent the shell from publishing a status.
+    parent = subprocess.check_output(["wsl", "--", "wslpath", "-w", "/tmp"], text=True).strip()
+    with tempfile.TemporaryDirectory(dir=parent, prefix="ok-ww-updater-") as directory:
+        yield Path(directory)
+
+
 def _start_updater(
     *, repository: Path, control: Path, fake_bin: Path, command_log: Path, stop: Path,
     retry_seconds: str = "300",
@@ -85,12 +100,15 @@ def _start_updater(
     }
 
     if os.name == "nt":
-        executable = ["wsl", "-u", "root", "env"]
+        executable = ["wsl", "--", "env"]
         converted = {
             name: _wsl_path(value) if isinstance(value, Path) else value
             for name, value in variables.items()
         }
-        path = f"{_wsl_path(fake_bin)}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        linux_bin = _wsl_path(fake_bin)
+        executables = [f"{linux_bin}/{file.name}" for file in fake_bin.iterdir()]
+        subprocess.run(["wsl", "--", "chmod", "755", *executables], check=True)
+        path = f"{linux_bin}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         command = executable + [f"PATH={path}"] + [
             f"{name}={value}" for name, value in converted.items()
         ] + ["sh", _wsl_path(script)]
@@ -108,18 +126,14 @@ def _start_updater(
     )
 
 
-@pytest.mark.skipif(
-    os.name == "nt" and not (Path(os.environ.get("SystemRoot", "C:/Windows")) / "System32/wsl.exe").exists(),
-    reason="WSL is required to run the POSIX updater script on Windows",
-)
 def test_web_manual_update_request_is_consumed_by_auto_updater(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    updater_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repository = tmp_path / "repository"
-    control = tmp_path / "control"
-    fake_bin = tmp_path / "bin"
-    command_log = tmp_path / "docker-commands.log"
-    stop = tmp_path / "stop"
+    repository = updater_dir / "repository"
+    control = updater_dir / "control"
+    fake_bin = updater_dir / "bin"
+    command_log = updater_dir / "docker-commands.log"
+    stop = updater_dir / "stop"
     repository.mkdir()
     (repository / ".git").mkdir()
     (repository / "compose.yaml").write_text("services: {}\n", encoding="utf-8")
@@ -182,6 +196,7 @@ fi
         initial_commands = command_log.read_text(encoding="utf-8")
         assert "build --platform linux/amd64" not in initial_commands
 
+        monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("OK_WW_UPDATE_CONTROL_DIR", str(control))
         app = create_cloud_web_app(
             CloudSettings(data_dir=tmp_path / "cloud-data"),
@@ -245,22 +260,19 @@ fi
 
 
 @pytest.fixture
-def updater_sandbox(tmp_path: Path):
-    if os.name == "nt" and not (
-        Path(os.environ.get("SystemRoot", "C:/Windows")) / "System32/wsl.exe"
-    ).exists():
-        pytest.skip("WSL is required to run the POSIX updater script on Windows")
-    repository = tmp_path / "repository"
-    control = tmp_path / "control"
-    fake_bin = tmp_path / "bin"
-    command_log = tmp_path / "commands.log"
-    stop = tmp_path / "stop"
+def updater_sandbox(updater_dir: Path):
+    repository = updater_dir / "repository"
+    control = updater_dir / "control"
+    fake_bin = updater_dir / "bin"
+    command_log = updater_dir / "commands.log"
+    stop = updater_dir / "stop"
     for path in (repository, repository / ".git", control, fake_bin):
         path.mkdir()
     (repository / "compose.yaml").write_text("services: {}\n", encoding="utf-8")
     (repository / "VERSION").write_text("v-test\n", encoding="utf-8")
-    (control / "head").write_text("old-revision\n", encoding="utf-8")
-    (control / "remote").write_text("new-revision\n", encoding="utf-8")
+    (control / "head").write_text("old-revision\n", encoding="utf-8", newline="\n")
+    (control / "remote").write_text("new-revision\n", encoding="utf-8", newline="\n")
+    (control / "container-id").write_text("initial-runner", encoding="utf-8")
     _write_executable(fake_bin / "git", """#!/bin/sh
 printf 'git %s\\n' "$*" >>"$CLOUD_UPDATE_TEST_LOG"
 state="$CLOUD_UPDATE_CONTROL_DIR"
@@ -281,12 +293,19 @@ case "$*" in
   *"config --images cloud-runner"*) printf 'test/cloud-runner:dev\\n' ;;
   "build "*)
     printf 'builder=%s\\n' "${DOCKER_BUILDKIT:-}" >>"$CLOUD_UPDATE_TEST_LOG"
+    if [ -f "$state/start-task-during-build" ]; then touch "$state/runtime-busy"; fi
     if [ -f "$state/fail-revision" ] && [ "$(cat "$state/fail-revision")" = "$(cat "$state/head")" ]; then
       exit 1
     fi
     [ "$DOCKER_BUILDKIT" = "1" ] && [ ! -f "$state/fail-build" ] ;;
-  *"up -d "*) [ ! -f "$state/fail-up" ] ;;
-  *"ps -q cloud-runner"*) printf 'running-container\\n' ;;
+  *"up -d "*)
+    [ ! -f "$state/fail-up" ] || exit 1
+    printf 'updated-runner' >"$state/container-id"
+    if [ ! -f "$state/legacy-label" ]; then cp "$state/head" "$state/running-revision"; fi ;;
+  *"ps -q cloud-runner"*) [ ! -f "$state/docker-unavailable" ] && cat "$state/container-id" ;;
+  *"org.opencontainers.image.revision"*)
+    [ "$4" = "$(cat "$state/container-id")" ] || exit 1
+    if [ -f "$state/running-revision" ]; then cat "$state/running-revision"; fi ;;
   *".State.Running"*) printf 'true\\n' ;;
 esac
 """)
@@ -328,9 +347,7 @@ fi
         path = control / "status"
         try:
             return path.read_text(encoding="utf-8").strip()
-        except (FileNotFoundError, PermissionError):
-            # WSL replaces this file atomically; Windows can briefly deny opens
-            # during the rename, so let the polling assertion try again.
+        except FileNotFoundError:
             return ""
 
     def commands():
@@ -346,7 +363,7 @@ fi
         set_clock=set_clock,
     )
     for process in processes:
-        if process.poll() is None:
+        if process.returncode is None:
             halt(process)
 
 
@@ -389,7 +406,7 @@ def test_new_update_does_not_reuse_prepared_revision(updater_sandbox, trigger):
     if trigger == "manual":
         (sandbox.control / "request").touch()
     else:
-        (sandbox.control / "head").write_text("another-revision\n", encoding="utf-8")
+        (sandbox.control / "head").write_text("another-revision\n", encoding="utf-8", newline="\n")
     sandbox.start()
     _wait_until(lambda: sandbox.commands().count("fetch --quiet") >= 2)
     _wait_until(lambda: (sandbox.control / "message").read_text().strip() == "Failed to fetch Git updates")
@@ -406,7 +423,7 @@ def test_new_update_does_not_reuse_prepared_revision(updater_sandbox, trigger):
 def test_retry_retains_repository_safety_checks(updater_sandbox, blocker):
     sandbox = updater_sandbox
     (sandbox.control / "needs-rebuild").touch()
-    (sandbox.control / "rebuild-revision").write_text("old-revision\n", encoding="utf-8")
+    (sandbox.control / "rebuild-revision").write_text("old-revision\n", encoding="utf-8", newline="\n")
     (sandbox.control / blocker).touch()
     if blocker == "non-fast-forward":
         (sandbox.control / "request").touch()
@@ -420,7 +437,7 @@ def test_retry_retains_repository_safety_checks(updater_sandbox, blocker):
 def test_prepared_retry_waits_for_busy_runtime(updater_sandbox):
     sandbox = updater_sandbox
     (sandbox.control / "needs-rebuild").touch()
-    (sandbox.control / "rebuild-revision").write_text("old-revision\n", encoding="utf-8")
+    (sandbox.control / "rebuild-revision").write_text("old-revision\n", encoding="utf-8", newline="\n")
     (sandbox.control / "runtime-busy").touch()
     (sandbox.control / "offline").touch()
     sandbox.start()
@@ -433,6 +450,94 @@ def test_prepared_retry_waits_for_busy_runtime(updater_sandbox):
     assert "build --platform linux/amd64" in sandbox.commands()
 
 
+@pytest.mark.parametrize("deployed", ["older", "current", "unknown", "unlabelled"])
+def test_shared_checkout_matches_remote_but_runner_revision_is_checked(updater_sandbox, deployed):
+    sandbox = updater_sandbox
+    head = "a" * 40
+    for name in ("head", "remote"):
+        (sandbox.control / name).write_text(head, encoding="utf-8")
+    if deployed != "unlabelled":
+        revision = {"current": head, "older": "b" * 40, "unknown": "unknown"}[deployed]
+        (sandbox.control / "running-revision").write_text(revision, encoding="utf-8")
+    if deployed in {"unknown", "unlabelled"}:
+        # Some old source trees still don't stamp a revision after recreating.
+        (sandbox.control / "legacy-label").touch()
+    process = sandbox.start()
+    _wait_until(lambda: sandbox.status() == "up_to_date")
+    expected_builds = int(deployed != "current")
+    assert sandbox.commands().count("builder=1") == expected_builds
+    if expected_builds:
+        assert (sandbox.control / "applied-runner").read_text().strip() == f"{head} updated-runner"
+    sandbox.halt(process)
+    process = sandbox.start()
+    _wait_until(lambda: sandbox.commands().count("fetch --quiet") == 2)
+    _wait_until(lambda: sandbox.status() == "up_to_date")
+    assert sandbox.commands().count("builder=1") == expected_builds
+    if deployed in {"unknown", "unlabelled"}:
+        sandbox.halt(process)
+        (sandbox.control / "container-id").write_text("external-runner", encoding="utf-8")
+        sandbox.start()
+        _wait_until(lambda: sandbox.commands().count("fetch --quiet") == 3)
+        _wait_until(lambda: sandbox.status() == "up_to_date")
+        assert sandbox.commands().count("builder=1") == 2
+
+
+def test_failed_health_wait_for_stale_runner_retries_without_git(updater_sandbox):
+    sandbox = updater_sandbox
+    (sandbox.control / "head").write_bytes((sandbox.control / "remote").read_bytes())
+    (sandbox.control / "running-revision").write_text("old-revision", encoding="utf-8")
+    (sandbox.control / "fail-up").touch()
+    sandbox.set_clock(1000)
+    process = sandbox.start()
+    _wait_until(lambda: sandbox.status() == "failed")
+    assert not (sandbox.control / "applied-runner").exists()
+    sandbox.halt(process)
+    (sandbox.control / "offline").touch()
+    (sandbox.control / "fail-up").unlink()
+    sandbox.set_clock(1001)
+    sandbox.start()
+    _wait_until(lambda: sandbox.status() == "up_to_date")
+    assert (sandbox.control / "applied-runner").read_text().strip() == "new-revision updated-runner"
+    assert sandbox.commands().count("fetch --quiet") == 1
+    assert sandbox.commands().count("up -d --no-deps --force-recreate --wait") == 2
+
+
+def test_task_starting_during_build_defers_recreation_across_restart(updater_sandbox):
+    sandbox = updater_sandbox
+    (sandbox.control / "start-task-during-build").touch()
+    process = sandbox.start()
+    _wait_until(lambda: sandbox.status() == "deferred")
+    assert sandbox.commands().count("builder=1") == 1
+    assert "up -d --no-deps" not in sandbox.commands()
+    sandbox.halt(process)
+    (sandbox.control / "start-task-during-build").unlink()
+    (sandbox.control / "runtime-busy").unlink()
+    sandbox.start()
+    _wait_until(lambda: sandbox.status() == "up_to_date")
+    assert sandbox.commands().count("up -d --no-deps") == 1
+
+
+def test_interrupted_manual_request_survives_busy_runner_and_docker_outage(updater_sandbox):
+    sandbox = updater_sandbox
+    (sandbox.control / "request.in-progress").touch()
+    (sandbox.control / "head").write_bytes((sandbox.control / "remote").read_bytes())
+    (sandbox.control / "running-revision").write_bytes((sandbox.control / "head").read_bytes())
+    (sandbox.control / "runtime-busy").touch()
+    (sandbox.control / "docker-unavailable").touch()
+    process = sandbox.start()
+    _wait_until(lambda: sandbox.status() == "deferred")
+    assert (sandbox.control / "runtime-busy").exists()
+    assert (sandbox.control / "needs-rebuild").exists()
+    assert "fetch --quiet" not in sandbox.commands()
+    sandbox.halt(process)
+    (sandbox.control / "docker-unavailable").unlink()
+    (sandbox.control / "runtime-busy").unlink()
+    sandbox.start()
+    _wait_until(lambda: sandbox.status() == "up_to_date")
+    assert sandbox.commands().count("builder=1") == 1
+    assert not (sandbox.control / "request.in-progress").exists()
+
+
 @pytest.mark.parametrize("offline_at_check", [False, True], ids=["remote-fixed", "git-offline"])
 @pytest.mark.parametrize("transition", ["running", "busy", "restart"])
 def test_periodic_check_is_not_postponed_by_failed_retries(
@@ -440,7 +545,7 @@ def test_periodic_check_is_not_postponed_by_failed_retries(
 ):
     sandbox = updater_sandbox
     sandbox.set_clock(1000)
-    (sandbox.control / "fail-revision").write_text("new-revision\n", encoding="utf-8")
+    (sandbox.control / "fail-revision").write_text("new-revision\n", encoding="utf-8", newline="\n")
     process = sandbox.start(interval_seconds="30")
     _wait_until(lambda: sandbox.status() == "failed")
     _wait_until(lambda: (sandbox.control / "next-remote-check").exists())
@@ -456,7 +561,7 @@ def test_periodic_check_is_not_postponed_by_failed_retries(
         (sandbox.control / "offline").touch()
         (sandbox.control / "fail-revision").unlink()
     else:
-        (sandbox.control / "remote").write_text("fixed-revision\n", encoding="utf-8")
+        (sandbox.control / "remote").write_text("fixed-revision\n", encoding="utf-8", newline="\n")
     if transition == "restart":
         sandbox.halt(process)
     elif transition == "busy":

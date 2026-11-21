@@ -3,6 +3,8 @@ set -eu
 
 repository_dir="${CLOUD_UPDATE_REPOSITORY_DIR:-/workspace}"
 compose_file="${CLOUD_UPDATE_COMPOSE_FILE:-/workspace/compose.yaml}"
+smtp_overlay="${CLOUD_UPDATE_SMTP_OVERLAY:-}"
+smtp_source="${OK_WW_SMTP_PASSWORD_SOURCE:-}"
 remote_name="${CLOUD_UPDATE_REMOTE:-origin}"
 branch_name="${CLOUD_UPDATE_BRANCH:-master}"
 autocrlf="${CLOUD_UPDATE_AUTOCRLF:-}"
@@ -83,19 +85,66 @@ rebuild_retry_due() {
     [ "$(date +%s)" -ge "$next_retry" ]
 }
 
+compose_command() {
+    if [ -n "$smtp_overlay" ]; then
+        set -- -f "$smtp_overlay" "$@"
+    fi
+    docker compose --project-name "$project_name" -f "$compose_file" "$@"
+}
+
+runner_container_id() {
+    compose_command ps -q cloud-runner
+}
+
+resolve_smtp_source() {
+    # Compose creates the runner on the host daemon. /workspace is only a
+    # client-side path. Reuse the actual host mount, including on Docker Desktop.
+    existing_runner=$(compose_command ps -a -q cloud-runner) || return 1
+    if [ -n "$existing_runner" ]; then
+        mounted_source=$(docker inspect --format \
+            '{{range .Mounts}}{{if eq .Destination "/run/secrets/smtp_password"}}{{.Source}}{{end}}{{end}}' \
+            "$existing_runner") || return 1
+        if [ -n "$mounted_source" ]; then
+            printf '%s\n' "$mounted_source"
+            return 0
+        fi
+    fi
+
+    # An initial deployment may have no runner yet. Translate a relative
+    # source against the host checkout before handing it to nested Compose.
+    case "$smtp_source" in
+        /*) printf '%s\n' "$smtp_source" ;;
+        ''|?:*|\\*) return 1 ;;
+        *)
+            host_checkout=$(docker inspect --format \
+                '{{range .Mounts}}{{if eq .Destination "/workspace"}}{{.Source}}{{end}}{{end}}' \
+                "$HOSTNAME") || return 1
+            [ -n "$host_checkout" ] || return 1
+            printf '%s/%s\n' "$host_checkout" "$smtp_source"
+            ;;
+    esac
+}
+
 runtime_is_busy() {
     marker="$control_dir/runtime-busy"
     if [ ! -f "$marker" ] || [ -L "$marker" ]; then
         return 1
     fi
-    container_id=$(docker compose --project-name "$project_name" -f "$compose_file" \
-        ps -q cloud-runner 2>/dev/null || true)
-    if [ -n "$container_id" ] && [ "$(docker inspect --format '{{.State.Running}}' \
-        "$container_id" 2>/dev/null || true)" = "true" ]; then
-        return 0
+    # Preserve the busy marker when Docker cannot confirm the runner stopped.
+    container_id=$(runner_container_id) || return 0
+    if [ -n "$container_id" ]; then
+        running=$(docker inspect --format '{{.State.Running}}' "$container_id") || return 0
+        [ "$running" = "false" ] || return 0
     fi
     rm -f "$marker"
     return 1
+}
+
+defer_if_busy() {
+    runtime_is_busy || return 1
+    write_control retry-check "1"
+    write_status deferred "Waiting for the running task or cloud game to stop"
+    return 0
 }
 
 cleanup_control() {
@@ -129,9 +178,7 @@ check_for_update() {
     force_rebuild="$1"
     check_remote="$2"
     write_status checking "Checking Git repository"
-    if runtime_is_busy; then
-        write_control retry-check "1"
-        write_status deferred "Waiting for the running task or cloud game to stop"
+    if defer_if_busy; then
         return 0
     fi
     rm -f "$control_dir/retry-check"
@@ -178,15 +225,41 @@ check_for_update() {
 
         write_status updating "Pulling Git updates"
         echo "Updating repository from $local_revision to $remote_revision"
+        write_control needs-rebuild "1"
         if ! git -C "$repository_dir" merge --ff-only FETCH_HEAD; then
             rm -f "$control_dir/needs-rebuild" "$control_dir/rebuild-revision"
             write_status failed "Failed to update Git repository"
             return 0
         fi
-        write_control needs-rebuild "1"
     elif [ "$force_rebuild" != "1" ] && [ ! -f "$control_dir/needs-rebuild" ]; then
-        write_status up_to_date "Already up to date"
-        return 0
+        # The shared checkout can advance independently of the deployed image.
+        if ! container_id=$(runner_container_id); then
+            write_status failed "Unable to inspect the cloud-runner container"
+            return 0
+        fi
+        if [ -z "$container_id" ]; then
+            write_status up_to_date "Repository up to date; cloud-runner is stopped"
+            return 0
+        fi
+        if ! running_revision=$(docker inspect --format \
+            '{{with index .Config.Labels "org.opencontainers.image.revision"}}{{.}}{{end}}' "$container_id"); then
+            write_status failed "Unable to inspect the cloud-runner revision"
+            return 0
+        fi
+        case "$running_revision" in
+            "$local_revision")
+                write_status up_to_date "Already up to date"
+                return 0
+                ;;
+            ''|unknown|dev)
+                # Older Dockerfiles may omit the revision even after a successful rebuild.
+                if [ "$(cat "$control_dir/applied-runner" 2>/dev/null || true)" = "$local_revision $container_id" ]; then
+                    write_status up_to_date "Already up to date"
+                    return 0
+                fi
+                ;;
+        esac
+        write_control needs-rebuild "1"
     fi
 
     if [ -s "$repository_dir/VERSION" ]; then
@@ -196,8 +269,15 @@ check_for_update() {
     fi
     build_revision=$(git -C "$repository_dir" rev-parse HEAD)
     write_control rebuild-revision "$build_revision"
-    image_name=$(docker compose --project-name "$project_name" -f "$compose_file" \
-        config --images cloud-runner | sed -n '1p')
+    if [ -n "$smtp_overlay" ]; then
+        if ! host_smtp_source=$(resolve_smtp_source); then
+            schedule_rebuild_retry
+            write_status failed "Unable to resolve the host SMTP password file path"
+            return 0
+        fi
+        export OK_WW_SMTP_PASSWORD_SOURCE="$host_smtp_source"
+    fi
+    image_name=$(compose_command config --images cloud-runner | sed -n '1p')
     if [ -z "$image_name" ]; then
         schedule_rebuild_retry
         write_status failed "Unable to determine the cloud-runner image"
@@ -213,13 +293,18 @@ check_for_update() {
         write_status failed "Docker image build failed"
         return 0
     fi
+    if defer_if_busy; then
+        return 0
+    fi
     if ! CLOUD_BUILD_VERSION="$build_version" CLOUD_BUILD_REVISION="$build_revision" \
-        docker compose --project-name "$project_name" -f "$compose_file" \
-        up -d --no-deps --force-recreate --wait \
+        compose_command up -d --no-deps --force-recreate --wait \
         --wait-timeout "$health_timeout_seconds" cloud-runner; then
         schedule_rebuild_retry
         write_status failed "Docker container update failed"
         return 0
+    fi
+    if container_id=$(runner_container_id) && [ -n "$container_id" ]; then
+        write_control applied-runner "$build_revision $container_id"
     fi
     rm -f "$control_dir/needs-rebuild" "$control_dir/next-retry" "$control_dir/rebuild-revision"
     write_status up_to_date "Docker updated to $build_version"
@@ -244,12 +329,11 @@ while true; do
         check_remote="1"
     fi
     if [ -f "$control_dir/request" ] && [ ! -L "$control_dir/request" ]; then
-        if mv "$control_dir/request" "$control_dir/request.in-progress"; then
-            rm -f "$control_dir/rebuild-revision"
-            write_control needs-rebuild "1"
-        fi
+        mv "$control_dir/request" "$control_dir/request.in-progress"
     fi
     if [ -f "$control_dir/request.in-progress" ] && [ ! -L "$control_dir/request.in-progress" ]; then
+        rm -f "$control_dir/rebuild-revision"
+        write_control needs-rebuild "1"
         force_rebuild="1"
     fi
     if [ "$force_rebuild" = "1" ] || rebuild_retry_due \

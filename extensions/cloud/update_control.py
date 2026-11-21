@@ -13,11 +13,17 @@ UPDATE_HEARTBEAT_TIMEOUT_ENV = "OK_WW_UPDATE_HEARTBEAT_TIMEOUT"
 BUSY_UPDATE_STATES = {"queued", "checking", "deferred", "updating", "rebuilding"}
 
 
+class DockerUpdateBusy(RuntimeError):
+    pass
+
+
 class DockerUpdateControl:
     def __init__(self, data_dir: Path, fallback_version: str = "dev") -> None:
         configured = os.environ.get(UPDATE_CONTROL_ENV, "").strip()
         self.directory = Path(configured) if configured else data_dir / "update-control"
         self.fallback_version = fallback_version
+        revision = os.environ.get("OK_WW_BUILD_REVISION", "").strip()
+        self.revision = revision if revision not in {"", "dev", "unknown"} else None
 
     def status(self) -> dict[str, object]:
         heartbeat = self._read_float("available")
@@ -25,21 +31,33 @@ class DockerUpdateControl:
             heartbeat_timeout = float(os.environ.get(UPDATE_HEARTBEAT_TIMEOUT_ENV, "120"))
         except ValueError:
             heartbeat_timeout = 120.0
+        pending = (self.directory / "request").exists() or (self.directory / "request.in-progress").exists()
+        state = self._read("status", "idle")
+        message = self._read("message", "")
+        if pending and state not in BUSY_UPDATE_STATES:
+            state, message = "queued", "Manual Docker update requested"
         return {
             "enabled": heartbeat is not None and time.time() - heartbeat <= heartbeat_timeout,
-            "status": self._read("status", "idle"),
-            "message": self._read("message", ""),
+            "status": state,
+            "message": message,
             "current_version": self.fallback_version,
+            "current_revision": self.revision,
         }
 
     def request_update(self) -> dict[str, object]:
-        if not self.status()["enabled"]:
+        status = self.status()
+        if not status["enabled"]:
             raise RuntimeError("Docker auto-updater is not available")
-        self._write("status", "queued")
-        self._write("message", "Manual Docker update requested")
-        self._write("request", f"{time.time():.6f}")
-        result = self.status()
-        return result
+        if status["status"] in BUSY_UPDATE_STATES:
+            raise DockerUpdateBusy("A Docker update is in progress")
+        # The updater owns status and message. Publish one request without
+        # overwriting progress from a periodic check that just started.
+        try:
+            with (self.directory / "request").open("x", encoding="utf-8") as request:
+                request.write(f"{time.time():.6f}\n")
+        except FileExistsError as exc:
+            raise DockerUpdateBusy("A Docker update is in progress") from exc
+        return {**status, "status": "queued", "message": "Manual Docker update requested"}
 
     def update_in_progress(self) -> bool:
         status = self.status()
@@ -51,6 +69,18 @@ class DockerUpdateControl:
             self._write("runtime-busy", f"{time.time():.6f}")
         else:
             marker.unlink(missing_ok=True)
+
+    def reserve_runtime(self) -> None:
+        # The updater publishes "checking" before inspecting this marker.
+        # Publish our intent first as well so the two starts cannot pass each other.
+        marker = self.directory / "runtime-busy"
+        already_busy = marker.exists()
+        if not already_busy:
+            self.set_runtime_busy(True)
+        if self.update_in_progress():
+            if not already_busy:
+                self.set_runtime_busy(False)
+            raise DockerUpdateBusy("A Docker update is in progress")
 
     def _read(self, name: str, default: str) -> str:
         try:

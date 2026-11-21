@@ -26,7 +26,7 @@ from .ok_bridge import CloudDeviceManager, create_cloud_ok_class
 from .profile import ProfileStore
 from .session import CloudSession
 from .task_runner import build_cloud_task_config
-from .update_control import DockerUpdateControl
+from .update_control import DockerUpdateBusy, DockerUpdateControl
 
 
 logger = logging.getLogger(f"ok.{__name__}")
@@ -289,6 +289,7 @@ class CloudWebController:
         self._active_task: Any = None
         self._active_task_started = False
         self._manual_game_thread: threading.Thread | None = None
+        self._manual_start_pending = False
         self._manual_game_error: str | None = None
         self._manual_game_stop_requested = False
         self._monitor_stop = threading.Event()
@@ -329,8 +330,6 @@ class CloudWebController:
 
     def start_task(self, task_identifier: str, *, allow_manual_login: bool | None = None):
         with self._lock:
-            if self._update_control is not None and self._update_control.update_in_progress():
-                raise RuntimeError("A Docker update is in progress")
             if self._active_task is not None:
                 raise RuntimeError("Another task is already running")
             if self._manual_game_thread is not None and self._manual_game_thread.is_alive():
@@ -340,34 +339,30 @@ class CloudWebController:
 
             if is_multi_account_task(task):
                 raise ValueError(CLOUD_ACCOUNT_SWITCH_UNAVAILABLE)
-            self._active_task = task
-            self._active_task_started = False
-            if self._update_control is not None:
-                self._update_control.set_runtime_busy(True)
             if allow_manual_login is None:
                 allow_manual_login = not self.profile.is_enrolled(
                     self.session.settings.cloud_url
                 )
+            if self._update_control is not None:
+                self._update_control.reserve_runtime()
+            self._active_task = task
+            self._active_task_started = False
             try:
                 # Background triggers must not capture login/queue pages. The
                 # upstream task starter resumes the executor once in game.
                 self.runtime.pause()
                 self.session.start_game(allow_manual_login=allow_manual_login)
                 return self._original_start_task(task_identifier)
-            except AuthenticationRequiredError as exc:
-                self._notify_login_failure(exc)
+            except BaseException as exc:
+                if isinstance(exc, AuthenticationRequiredError):
+                    self._notify_login_failure(exc)
                 self._active_task = None
                 self._active_task_started = False
-                if self._update_control is not None:
-                    self._update_control.set_runtime_busy(False)
-                self._stop_game_session()
-                raise
-            except BaseException:
-                self._active_task = None
-                self._active_task_started = False
-                if self._update_control is not None:
-                    self._update_control.set_runtime_busy(False)
-                self._stop_game_session()
+                try:
+                    self._stop_game_session()
+                finally:
+                    if self._update_control is not None:
+                        self._update_control.set_runtime_busy(False)
                 raise
 
     def enqueue_scheduled(self, request: ScheduledTaskRequest) -> object:
@@ -383,50 +378,64 @@ class CloudWebController:
 
     def manual_game_status(self) -> dict[str, object]:
         with self._lock:
-            starting = (
-                not self._manual_game_stop_requested
-                and self._manual_game_thread is not None
-                and self._manual_game_thread.is_alive()
-            )
+            starting = not self._manual_game_stop_requested and self._manual_start_pending
             state = str(self.session.state)
             running = starting or state not in {"new", "closed", "failed"}
             return {
                 "state": state,
                 "running": running,
                 "busy": starting,
+                "stopping": self._manual_game_stop_requested and self._manual_start_pending,
                 "task_running": self._active_task is not None,
                 "error": self._manual_game_error,
             }
 
     def start_game_manually(self, *, run_executor: bool = False) -> dict[str, object]:
         with self._lock:
-            if self._update_control is not None and self._update_control.update_in_progress():
-                raise RuntimeError("A Docker update is in progress")
             if self._active_task is not None:
                 raise RuntimeError("An automation task is already running")
             if self._manual_game_thread is not None and self._manual_game_thread.is_alive():
                 return self.manual_game_status()
+            if self._update_control is not None:
+                self._update_control.reserve_runtime()
             self._manual_game_error = None
             self._manual_game_stop_requested = False
-            if self._update_control is not None:
-                self._update_control.set_runtime_busy(True)
             self._manual_game_thread = threading.Thread(
                 target=self._run_manual_game_start, args=(run_executor,),
                 name="cloud-game-manual-start",
                 daemon=True,
             )
-            self._manual_game_thread.start()
+            self._manual_start_pending = True
+            try:
+                self._manual_game_thread.start()
+            except RuntimeError:
+                self._manual_start_pending = False
+                if self._update_control is not None and not self.manual_game_status()["running"]:
+                    self._update_control.set_runtime_busy(False)
+                raise
         return self.manual_game_status()
+
+    def request_docker_update(self) -> dict[str, object]:
+        with self._lock:
+            status = self.manual_game_status()
+            if status["task_running"]:
+                raise DockerUpdateBusy("An automation task is running")
+            if status["running"] or status["stopping"]:
+                raise DockerUpdateBusy("The cloud game is running")
+            if self._update_control is None:
+                raise RuntimeError("Docker auto-updater is not available")
+            return self._update_control.request_update()
 
     def _run_manual_game_start(self, run_executor: bool = False) -> None:
         try:
             if run_executor:
                 self.runtime.pause()
             self.session.start_game(allow_manual_login=True)
-            if run_executor:
-                with self._lock:
-                    if not self._manual_game_stop_requested:
-                        self.runtime.resume()
+            with self._lock:
+                if self._manual_game_stop_requested:
+                    self._stop_game_session()
+                elif run_executor:
+                    self.runtime.resume()
         except Exception as exc:
             with self._lock:
                 if not self._manual_game_stop_requested:
@@ -436,24 +445,25 @@ class CloudWebController:
                         self._stop_game_session()
                     except Exception:
                         logger.exception("failed to clean up cloud-game start")
-            if self._update_control is not None:
-                self._update_control.set_runtime_busy(False)
+        finally:
+            with self._lock:
+                self._manual_start_pending = False
+                if self._update_control is not None and (
+                    self._manual_game_stop_requested or self._manual_game_error is not None
+                ):
+                    self._update_control.set_runtime_busy(False)
 
     def stop_game_manually(self) -> dict[str, object]:
         with self._lock:
             self._manual_game_stop_requested = True
-            task_running = self._active_task is not None
-
-        if task_running:
-            self.stop_task()
-        else:
-            self._stop_game_session()
-            if self._update_control is not None:
-                self._update_control.set_runtime_busy(False)
-
-        with self._lock:
+            if self._active_task is not None:
+                self.stop_task()
+            else:
+                self._stop_game_session()
+                if self._update_control is not None and not self._manual_start_pending:
+                    self._update_control.set_runtime_busy(False)
             self._manual_game_error = None
-        return self.manual_game_status()
+            return self.manual_game_status()
 
     def task_action(self, task_identifier: str, action: str):
         if action in {"enable", "disable"}:
@@ -809,11 +819,11 @@ def create_cloud_web_app(
         return {"status": "ok"}
 
     @app.get("/api/cloud-game", include_in_schema=False)
-    async def cloud_game_status():
+    def cloud_game_status():
         return controller.manual_game_status()
 
     @app.post("/api/cloud-game/start", include_in_schema=False)
-    async def start_cloud_game(run_executor: bool = False):
+    def start_cloud_game(run_executor: bool = False):
         try:
             return controller.start_game_manually(run_executor=run_executor)
         except RuntimeError as exc:
@@ -824,27 +834,24 @@ def create_cloud_web_app(
         return await asyncio.to_thread(controller.stop_game_manually)
 
     @app.get("/api/docker-update", include_in_schema=False)
-    async def docker_update_status():
+    def docker_update_status():
         game_status = controller.manual_game_status()
         return {
             **update_control.status(),
             "task_running": game_status["task_running"],
-            "game_running": game_status["running"],
+            "game_running": game_status["running"] or game_status["stopping"],
         }
 
     @app.post("/api/docker-update", include_in_schema=False, status_code=202)
-    async def request_docker_update(
+    def request_docker_update(
         x_ok_ww_update: str | None = Header(default=None),
     ):
         if x_ok_ww_update != "1":
             raise HTTPException(status_code=403, detail="Missing update confirmation")
-        game_status = controller.manual_game_status()
-        if game_status["task_running"]:
-            raise HTTPException(status_code=409, detail="An automation task is running")
-        if game_status["running"]:
-            raise HTTPException(status_code=409, detail="The cloud game is running")
         try:
-            return update_control.request_update()
+            return controller.request_docker_update()
+        except DockerUpdateBusy as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 

@@ -370,24 +370,28 @@ function drawBar() {
   $("executor").textContent = t(
     game?.busy ? "Cancel start" : status?.paused ? "Start executor" : "Pause executor",
   );
-  $("executor").disabled = actionPending || !status || status.starting || (cloud && !game);
+  const updateBusy = update?.enabled && ["queued", "checking", "deferred", "updating", "rebuilding"].includes(update.status);
+  $("executor").disabled = actionPending || !status || status.starting || (cloud && (!game || game.stopping))
+    || (cloud && updateBusy && status.paused && !game.running);
   $("cancel-task").hidden = !status?.current_task;
   $("cancel-task").disabled = actionPending;
   if (!cloud) return;
   $("cloud-controls").hidden = false;
-  const busy = ["queued", "checking", "deferred", "updating", "rebuilding"].includes(update?.status);
   const play = $("okww-cloud-game-control");
   play.textContent = t(
     game?.busy ? "Starting Cloud Game..." : game?.running ? "Stop Cloud Game" : "Start Cloud Game",
   );
-  play.disabled = actionPending || !game || busy || (game.task_running && !game.running);
+  play.disabled = actionPending || !game || game.stopping || (!game.running && (updateBusy || game.task_running));
   play.title = game?.error || game?.state || "";
   const updateButton = $("okww-docker-update");
-  updateButton.textContent = t(busy ? "Updating Docker..." : "Update Docker");
+  updateButton.textContent = t(updateBusy ? "Updating Docker..." : "Update Docker");
   updateButton.disabled =
-    actionPending || !update?.enabled || busy || update.task_running || update.game_running;
+    actionPending || !update?.enabled || updateBusy || update.task_running || update.game_running;
   updateButton.title = update?.message || update?.status || "";
-  $("okww-docker-version").textContent = update?.current_version || "";
+  const version = $("okww-docker-version");
+  const revision = update?.current_revision;
+  version.textContent = [update?.current_version, revision?.slice(0, 8)].filter(Boolean).join(" · ");
+  version.title = revision || "";
 }
 let pollPromise;
 function poll() {

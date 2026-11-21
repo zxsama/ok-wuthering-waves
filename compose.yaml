@@ -9,7 +9,7 @@ services:
     image: ${CLOUD_IMAGE:-ok-wuthering-waves-cloud:dev}
     platform: linux/amd64
     restart: "${CLOUD_RESTART_POLICY:-no}"
-    environment:
+    environment: &runner-environment
       CLOUD_COMMAND: ${CLOUD_COMMAND:-auto}
       CLOUD_ENABLE_NOVNC: ${CLOUD_ENABLE_NOVNC:-1}
       CLOUD_NOVNC_INTERNAL_PORT: ${CLOUD_NOVNC_INTERNAL_PORT:-15980}
@@ -82,6 +82,20 @@ services:
     image: ${CLOUD_UPDATER_IMAGE:-ok-wuthering-waves-updater:dev}
     restart: unless-stopped
     environment:
+      # The updater runs Compose again without access to the launching shell
+      # or its --env-file. Forward the inputs used to recreate the runner.
+      <<: *runner-environment
+      CLOUD_IMAGE: ${CLOUD_IMAGE:-}
+      CLOUD_BUILD_VERSION: ${CLOUD_BUILD_VERSION:-}
+      CLOUD_BUILD_REVISION: ${CLOUD_BUILD_REVISION:-}
+      CLOUD_RESTART_POLICY: ${CLOUD_RESTART_POLICY:-}
+      CLOUD_WEB_HOST_PORT: ${CLOUD_WEB_HOST_PORT:-}
+      CLOUD_NOVNC_PORT: ${CLOUD_NOVNC_PORT:-}
+      CLOUD_DNS_PRIMARY: ${CLOUD_DNS_PRIMARY:-}
+      CLOUD_DNS_SECONDARY: ${CLOUD_DNS_SECONDARY:-}
+      CLOUD_SHM_SIZE: ${CLOUD_SHM_SIZE:-}
+      CLOUD_LOG_MAX_SIZE: ${CLOUD_LOG_MAX_SIZE:-}
+      CLOUD_LOG_MAX_FILES: ${CLOUD_LOG_MAX_FILES:-}
       CLOUD_UPDATE_BRANCH: ${CLOUD_UPDATE_BRANCH:-master}
       CLOUD_UPDATE_AUTOCRLF: ${CLOUD_UPDATE_AUTOCRLF:-}
       CLOUD_UPDATE_COMPOSE_FILE: /workspace/compose.yaml

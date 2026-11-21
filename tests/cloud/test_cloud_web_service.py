@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -182,6 +183,49 @@ def test_cloud_index_has_single_workspace_with_shared_run_controls():
     assert elements["workspace-page"] == "main"
     assert elements["okww-cloud-game-control"] == elements["okww-docker-update"] == "button"
     assert "okww-docker-version" in elements
+
+
+def test_manual_docker_update_http_statuses(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from extensions.cloud.web_service import create_cloud_web_app
+
+    directory = tmp_path / "update-control"
+    directory.mkdir()
+    monkeypatch.setenv("OK_WW_UPDATE_CONTROL_DIR", str(directory))
+    app = create_cloud_web_app(
+        CloudSettings(data_dir=tmp_path / "cloud-data"),
+        SimpleNamespace(call_page=lambda *_: False),
+        schedule_manager_factory=lambda *_: SimpleNamespace(stop=lambda: None),
+    )
+    client = TestClient(app)
+    path = "/api/docker-update"
+    headers = {"X-OK-WW-Update": "1"}
+    controller = app.state.cloud_controller
+    try:
+        assert client.get(path).json()["enabled"] is False
+        assert client.post(path).status_code == 403
+        assert client.post(path, headers=headers).status_code == 503
+        (directory / "available").write_text(str(time.time()))
+        controller._active_task = object()
+        assert client.post(path, headers=headers).status_code == 409
+        controller._active_task = None
+        controller.session.state = "in_game"
+        assert client.post(path, headers=headers).status_code == 409
+        controller.session.state = "closed"
+        assert not (directory / "request").exists()
+        response = client.post(path, headers=headers)
+        assert (response.status_code, response.json()["status"]) == (202, "queued")
+        assert client.get(path).json()["status"] == "queued"
+        assert client.post(path, headers=headers).status_code == 409
+        (directory / "request").unlink()
+        (directory / "status").write_text("rebuilding")
+        assert client.get(path).json()["status"] == "rebuilding"
+        assert client.post(path, headers=headers).status_code == 409
+        assert not (directory / "request").exists()
+    finally:
+        client.close()
+        controller.close()
 
 
 def test_schedule_update_preserves_upstream_validation_and_stable_identifier():
@@ -917,6 +961,39 @@ def test_manual_cloud_game_reports_stopped_while_start_thread_exits():
 
     assert status["running"] is False
     assert status["busy"] is False
+
+
+def test_cancelled_game_start_keeps_update_blocked_until_browser_work_finishes(tmp_path):
+    from extensions.cloud.update_control import DockerUpdateBusy, DockerUpdateControl
+
+    control = DockerUpdateControl(tmp_path)
+    control.directory.mkdir()
+    (control.directory / "available").write_text(str(time.time()))
+    runtime, *_ = make_runtime(object())
+    session = FakeSession()
+    entered = threading.Event()
+    finish = threading.Event()
+
+    def start_game(**_):
+        entered.set()
+        assert finish.wait(3)
+        session.state = "in_game"
+
+    session.start_game = start_game
+    controller = CloudWebController(runtime, session, FakeProfile(True), update_control=control)
+    controller.start_game_manually()
+    try:
+        assert entered.wait(3)
+        assert controller.stop_game_manually()["stopping"]
+        assert (control.directory / "runtime-busy").is_file()
+        with pytest.raises(DockerUpdateBusy):
+            controller.request_docker_update()
+    finally:
+        finish.set()
+        controller._manual_game_thread.join(3)
+    assert session.state == "closed"
+    assert not (control.directory / "runtime-busy").exists()
+    assert controller.request_docker_update()["status"] == "queued"
 
 
 def test_closed_manual_browser_releases_state_and_can_start_again():
