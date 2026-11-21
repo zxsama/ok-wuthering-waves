@@ -211,6 +211,36 @@ def test_cloud_image_exposes_build_version_without_git_metadata():
     assert "OK_WW_BUILD_REVISION: ${CLOUD_BUILD_REVISION:-unknown}" in compose
 
 
+def test_release_metadata_does_not_invalidate_dependency_layers():
+    dockerfile = _read("docker/Dockerfile")
+    dependencies_end = dockerfile.index("python -m pip check")
+    application_copy = dockerfile.index("COPY . /app")
+
+    for declaration in (
+        "ARG OK_WW_BUILD_VERSION", "ARG OK_WW_BUILD_REVISION",
+        "ENV OK_WW_BUILD_VERSION", "LABEL org.opencontainers.image.version",
+    ):
+        assert dependencies_end < dockerfile.index(declaration) < application_copy
+    assert dockerfile.index("apt-get install") < dockerfile.index("ARG OK_SCRIPT_VERSION")
+    assert dockerfile.index("ARG OK_SCRIPT_VERSION") < dockerfile.index("python -m pip download")
+
+
+def test_dependency_downloads_survive_failed_build_layers():
+    dockerfile = _read("docker/Dockerfile")
+    for target in ("/var/cache/apt", "/var/lib/apt/lists", "/root/.cache/pip"):
+        mount = next(line for line in dockerfile.splitlines() if f"target={target}," in line)
+        assert "--mount=type=cache," in mount
+        assert "sharing=locked" in mount
+    assert "rm -f /etc/apt/apt.conf.d/docker-clean" in dockerfile
+    assert 'Binary::apt::APT::Keep-Downloaded-Packages "true";' in dockerfile
+    assert "--no-cache-dir" not in dockerfile
+    assert "rm -rf /var/lib/apt/lists" not in dockerfile
+    assert "PIP_DEFAULT_TIMEOUT=120" in dockerfile
+    assert "PIP_RETRIES=5" in dockerfile
+    assert 'Acquire::Retries "5"' in dockerfile
+    assert "signed-by=/etc/apt/keyrings/google-chrome.gpg" in dockerfile
+
+
 def test_cloud_image_installs_pinned_web_server_dependencies():
     requirements = _read("docker/requirements-cloud.txt")
 

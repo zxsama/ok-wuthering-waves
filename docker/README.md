@@ -49,6 +49,25 @@ The small label below the button is the version baked into the currently
 running image. Manual update requests rebuild even when Git is already current,
 which also allows retrying a previously failed image build.
 
+Manual requests and new update checks still fetch the remote branch. After a
+revision has been fetched and prepared, a scheduled retry of a failed build can
+reuse that revision without fetching again, provided the checkout still matches
+it and has no tracked local changes. Regular remote checks retain their interval
+during retries and updater restarts, so later remote fixes are still discovered.
+If a periodic check cannot reach Git, a matching prepared revision can still be
+rebuilt; a new manual request always requires a successful remote check.
+
+The updater builds with BuildKit. Release version and revision metadata are
+applied after the OS and Python dependency layers, so ordinary source-only
+updates reuse those layers without downloading dependencies again when the
+layer cache is available. BuildKit also keeps apt and pip download caches for
+reuse when a dependency layer must run again, including after a failed build.
+These caches belong to the Docker builder, not the repository or `cloud-data`
+volume. The first build after adopting this layout, dependency changes, a
+different builder, or cache cleanup may require downloads. Missing packages and
+index refreshes still need network access; this does not guarantee download
+resumption or an offline first build.
+
 The updater mounts `/var/run/docker.sock`, which grants it control over the
 host Docker daemon. Enable it only for a repository and image you trust. Change
 the interval, remote, or branch with `CLOUD_UPDATE_INTERVAL_SECONDS`,
