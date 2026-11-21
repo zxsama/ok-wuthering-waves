@@ -7,7 +7,7 @@ import os
 import re
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 
 BASE_URL = os.environ.get("OK_WW_MANAGEMENT_URL", "http://127.0.0.1:8765")
@@ -42,6 +42,26 @@ def main() -> None:
         tasks_text = body.inner_text()
         assert "📅 每日任务" in tasks_text
         assert "启动游戏, 登录, 领月卡" in tasks_text
+        task_response = context.request.get(f"{BASE_URL}/api/tasks")
+        assert task_response.ok
+        visible_tasks = [
+            task for task in task_response.json() if task["visible"] and not task["trigger"]
+        ]
+        assert visible_tasks, "Runtime must expose visible one-time tasks"
+        expect(page.locator("article.qt-task-card")).to_have_count(len(visible_tasks))
+        # Tasks is the complete list; group navigation must still narrow it.
+        groups = {task["group_name"] for task in visible_tasks if task["group_name"]}
+        assert groups, "Exercise grouped tasks, which previously disappeared from Tasks"
+        for group in sorted(groups):
+            translated_group = page.evaluate(
+                "group => okwwTranslations[group] || group", group
+            )
+            page.get_by_role("button", name=translated_group, exact=True).click(timeout=5_000)
+            expect(page.locator("article.qt-task-card")).to_have_count(
+                sum(task["group_name"] == group for task in visible_tasks)
+            )
+        page.get_by_role("button", name="任务", exact=True).click(timeout=5_000)
+        expect(page.locator("article.qt-task-card")).to_have_count(len(visible_tasks))
         page.screenshot(path=ARTIFACT_DIR / "tasks.png", animations="disabled", timeout=10_000)
 
         page.get_by_role("button", name="角色代码", exact=True).click(timeout=5_000)

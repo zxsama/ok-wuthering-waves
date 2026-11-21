@@ -14,4 +14,6 @@ The bundled upstream license is retained in `LICENSE.upstream.txt`.
 
 Local changes: relative imports; explicit FastAPI/Uvicorn dependencies;
 WebCustomTab event publishing through the current core event bus.
+The Tasks page lists all visible one-time tasks, including grouped tasks;
+individual group navigation continues to filter by group name.
 Only the cloud extension imports this package; no `ok` namespace aliases are installed.
