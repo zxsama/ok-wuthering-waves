@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import io
-import json
 import tempfile
 from pathlib import Path
 
@@ -232,23 +231,11 @@ class CloudCharacterCodeTask(WebCustomTab):
         return reloaded
 
     def _load_feature_index(self):
-        result = {}
-        coco_path = Path(__file__).resolve().parents[2] / "assets" / "coco_annotations.json"
-        if not coco_path.is_file():
-            return result
-        try:
-            data = json.loads(coco_path.read_text(encoding="utf-8"))
-            images = {item["id"]: item["file_name"] for item in data.get("images", [])}
-            categories = {item["id"]: item["name"] for item in data.get("categories", [])}
-            for annotation in data.get("annotations", []):
-                label = categories.get(annotation.get("category_id"))
-                filename = images.get(annotation.get("image_id"))
-                bbox = annotation.get("bbox", [])
-                if label and filename and len(bbox) == 4:
-                    result[label] = (coco_path.parent / filename, tuple(round(value) for value in bbox))
-        except (OSError, TypeError, ValueError, KeyError) as error:
-            self.logger.error(f"load character image index failed: {error}")
-        return result
+        template_dir = Path(__file__).resolve().parents[2] / "assets" / "templates"
+        # Each template is already cropped: <label>_<resolution>_<x>_<y>.png.
+        by_label = {path.stem.rsplit("_", 3)[0]: path for path in template_dir.glob("*.png")}
+        _, labels = self._characters()
+        return {name: by_label[label] for name, label in labels.items() if label in by_label}
 
     def _character_image_data_url(self, char_cls):
         class_name = char_cls.__name__
@@ -256,15 +243,12 @@ class CloudCharacterCodeTask(WebCustomTab):
             return self._image_cache[class_name]
         if self._feature_index is None:
             self._feature_index = self._load_feature_index()
-        _characters, labels = self._characters()
-        image_info = self._feature_index.get(labels.get(class_name))
-        if image_info is None:
+        image_path = self._feature_index.get(class_name)
+        if image_path is None:
             self._image_cache[class_name] = None
             return None
-        image_path, (x, y, width, height) = image_info
         try:
-            with Image.open(image_path) as source:
-                image = source.crop((x, y, x + width, y + height))
+            with Image.open(image_path) as image:
                 image.thumbnail((48, 48), Image.Resampling.LANCZOS)
                 output = io.BytesIO()
                 image.save(output, format="PNG")

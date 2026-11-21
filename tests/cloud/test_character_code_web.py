@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import base64
+import io
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
+
+from PIL import Image
 
 from extensions.cloud.management_web.task_tabs import call_task_tab_operation, task_tab_operations
 from ok.util.config import Config
@@ -49,6 +53,30 @@ class TestCloudCharacterCodeTask(unittest.TestCase):
             "export-team", "import-team",
         ):
             self.assertIn(("action", name), operations)
+
+    def test_state_returns_packaged_character_portraits(self):
+        task = CloudCharacterCodeTask(Mock(), Mock())
+        state = call_task_tab_operation(task, "query", "state")
+        characters = state["characters"]
+        reported = {"Lucilla", "Lucy", "Lumi", "Rebecca", "Qingxiao", "JingRan", "Hsin", "Suoming"}
+        self.assertLessEqual(reported, {item["class_name"] for item in characters})
+
+        for item in characters:
+            with self.subTest(character=item["class_name"]):
+                url = item["image_data_url"]
+                self.assertIsInstance(url, str)
+                header, encoded = url.split(",", 1)
+                self.assertEqual(header, "data:image/png;base64")
+                with Image.open(io.BytesIO(base64.b64decode(encoded, validate=True))) as portrait:
+                    self.assertEqual(portrait.format, "PNG")
+                    portrait.load()
+                    self.assertIsNotNone(portrait.convert("RGBA").getbbox())
+                    if item["class_name"] == "Lucy":
+                        templates = Path(__file__).resolve().parents[2] / "assets" / "templates"
+                        with Image.open(next(templates.glob("char_lucy_*.png"))) as source:
+                            source.thumbnail((48, 48), Image.Resampling.LANCZOS)
+                            self.assertEqual(portrait.size, source.size)
+                            self.assertEqual(portrait.convert("RGB").tobytes(), source.convert("RGB").tobytes())
 
     def test_create_edit_reset_and_delete_team(self):
         created = call_task_tab_operation(
