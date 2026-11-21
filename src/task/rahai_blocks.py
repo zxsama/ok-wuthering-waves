@@ -108,14 +108,17 @@ def _read_piece(frame, slot, cy):
     return Piece(slot, cells, pickup)
 
 
-def read_board(frame):
+def board_visible(frame):
     if frame is None:
-        return None
+        return False
     # Confirm the event icon and upper grid border.
     icon = frame[44:102, 50:110]
-    if np.count_nonzero(icon.min(axis=2) > 181) < 210:
-        return None
-    if _value(frame, 1024, 73, 3) - _value(frame, 1024, 85, 2) <= 45:
+    return (np.count_nonzero(icon.min(axis=2) > 181) >= 210
+            and _value(frame, 1024, 73, 3) - _value(frame, 1024, 85, 2) > 45)
+
+
+def read_board(frame):
+    if not board_visible(frame):
         return None
     # Check both the dark tray interiors and the bright gaps between them.
     # The interior samples alone can accidentally land in neighboring trays.

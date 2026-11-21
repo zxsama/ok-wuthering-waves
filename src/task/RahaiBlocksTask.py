@@ -2,7 +2,10 @@ import re
 
 from ok import BaseTask
 
-from extensions.rahai_input import drag_interaction
+from extensions.rahai_blast import blast_observation
+from extensions.rahai_challenge import configure_stage_mechanics, dismiss_rahai_guide, return_to_stage_list
+from extensions.rahai_fault import fault_mask
+from extensions.rahai_input import BoardHidden, drag_interaction, placement_frame
 from src.task.rahai_blocks import HEIGHT, WIDTH, canonical_frame, choose_move, clear_lines, preview_matches, read_board
 from src.task.task_icons import task_icon
 
@@ -66,6 +69,19 @@ class RahaiBlocksTask(BaseTask):
             abs(before.x - after.x) > .005 * self.width
             for (_, before), (_, after) in zip(stages, stages_after)
         )
+        if not moved:
+            def titles(page):
+                return sorted("".join(title.name.split()) for title, _ in page)
+
+            # A whole page can snap to the same card positions. Confirm new
+            # titles on a second frame so a transient OCR change is ignored.
+            new_titles = titles(stages_after)
+            if new_titles != titles(stages):
+                self.next_frame()
+                confirmed = self._stage_list()
+                if confirmed:
+                    moved = titles(confirmed) == new_titles
+                    stages_after = confirmed
         return stages_after, moved
 
     def _first_page(self, interaction, stages):
@@ -76,9 +92,7 @@ class RahaiBlocksTask(BaseTask):
         raise RuntimeError("无法定位到拉海洛方块关卡列表起点。")
 
     def _return_to_list(self):
-        if self._stage_details():
-            self.click(.942, .06, after_sleep=.45)
-        stages = self.wait_until(self._stage_list, time_out=5)
+        stages = return_to_stage_list(self)
         if not stages:
             raise RuntimeError("挑战结束后无法返回关卡列表。")
         return stages
@@ -107,6 +121,7 @@ class RahaiBlocksTask(BaseTask):
             raise RuntimeError(f"无法打开关卡「{title.name}」。")
 
         difficulty = ("简单", "困难")[completed]
+        configure_stage_mechanics(self, title.name, difficulty)
 
         def selected():
             return self.ocr(.68, .125, .96, .181, match=re.compile(difficulty + r"$"))
@@ -134,8 +149,11 @@ class RahaiBlocksTask(BaseTask):
             if not self.wait_until(self._ready_board, time_out=15):
                 raise ChallengeFailed("无法识别棋盘。")
             self._play_board(interaction)
-        except ChallengeFailed:
-            self._leave_challenge()
+        except ChallengeFailed as exc:
+            try:
+                self._leave_challenge()
+            except RuntimeError as leave_error:
+                raise RuntimeError(f"{exc} {leave_error}") from leave_error
             raise
         self.click(.5, .88, after_sleep=.6)
         if not self.wait_until(self._stage_details, time_out=5):
@@ -197,18 +215,12 @@ class RahaiBlocksTask(BaseTask):
                     return score, goal
         return None
 
-    def _reward(self):
-        return self.ocr(.36, .216, .64, .29, match=re.compile(r"^获\s*得$"))
+    def _reward(self, frame=None):
+        return self.ocr(.36, .216, .64, .29, match=re.compile(r"^获\s*得$"), frame=frame)
 
     def _ready_board(self):
         # The first score challenge includes a manual and three guided clicks.
-        help_page = self.ocr(.05, .28, .32, .35, match=re.compile(r"积分模式|奖章模式|数据损坏方块"))
-        if help_page:
-            confirm = self.ocr(.41, .88, .59, .95, match="确认")
-            if confirm:
-                self.click(confirm[0], after_sleep=.5)
-            elif self.ocr(.38, .90, .62, .96, match=re.compile(r"切换至最后一页")):
-                self.click(.75, .805, after_sleep=.5)
+        if dismiss_rahai_guide(self):
             return False
 
         for region, hint, target in (
@@ -236,14 +248,17 @@ class RahaiBlocksTask(BaseTask):
 
         source = piece.pickup
         dx, dy = move.drop
+        placement_frame(self)
         move_cursor(source)
         self.sleep(.12)
+        placement_frame(self)
         interaction.mouse_down(*point(source))
-        release_at_target = False
+        return_to_tray = True
         try:
             # Trigger the drag in the tray, but rotate over the board where
             # the game reliably accepts R even for pieces near the tray edge.
             self.sleep(.10)
+            placement_frame(self)
             move_cursor((source[0] - 16, source[1]))
             self.sleep(.12)
             for i in range(1, 9):
@@ -252,6 +267,7 @@ class RahaiBlocksTask(BaseTask):
             self.sleep(.15)
 
             def rotate():
+                placement_frame(self)
                 if not interaction.clickable():
                     raise RuntimeError("Game lost foreground focus during a drag")
                 interaction.send_key('r', down_time=.08)
@@ -267,17 +283,19 @@ class RahaiBlocksTask(BaseTask):
                 for ox, oy in ((0, 0), (0, -12), (-12, 0), (12, 0), (0, 12)):
                     move_cursor((dx + ox, dy + oy))
                     self.sleep(.16)
-                    if interaction.clickable() and preview_matches(canonical_frame(self.next_frame()), board, move):
-                        release_at_target = True
+                    if interaction.clickable() and preview_matches(placement_frame(self), board, move):
+                        return_to_tray = False
                         return True
-            if not release_at_target:
-                self.log_warning(f"Placement preview did not match: slot={move.slot}, turns={move.turns}, "
-                                 f"row={move.row}, col={move.col}")
-                self.screenshot("rahai_preview_mismatch")
-            return release_at_target
+            self.log_warning(f"Placement preview did not match: slot={move.slot}, turns={move.turns}, "
+                             f"row={move.row}, col={move.col}")
+            self.screenshot("rahai_preview_mismatch")
+            return False
+        except BoardHidden:
+            return_to_tray = False
+            raise
         finally:
             try:
-                if not release_at_target and interaction.clickable():
+                if return_to_tray and interaction.clickable():
                     # No task sleep here: cancellation must still release the button.
                     interaction.move(*point(source))
             finally:
@@ -288,17 +306,32 @@ class RahaiBlocksTask(BaseTask):
         rejected = set()
         for _ in range(160):
             self.next_frame()
-            board = self._playable_board() or self.wait_until(self._playable_board, time_out=2)
+            board = self._playable_board()
             if not board:
-                if self.wait_until(self._reward, time_out=3):
+                if self._reward():
                     return
-                raise ChallengeFailed("棋盘消失，未确认通关。")
+                # A first-visit guide can cover a board that was already ready.
+                board = self.wait_until(self._ready_board, time_out=6)
+                if not board:
+                    if self._reward():
+                        return
+                    raise ChallengeFailed("棋盘消失，未确认通关。")
             if not interaction.clickable():
                 raise RuntimeError("Game lost foreground focus; no further moves were sent.")
             move = choose_move(board, excluded=rejected)
             if move is None:
                 raise ChallengeFailed("剩余方块无合法落点。")
-            if not self._place(interaction, board, move):
+            expected, lines = clear_lines(board.mask | move.mask, board.fixed)
+            faults = 0
+            if lines and getattr(self, "_rahai_fault_stage", False) is True:
+                faults = fault_mask(canonical_frame(self.frame)) & board.mask & ~board.fixed
+            try:
+                placed = self._place(interaction, board, move)
+            except BoardHidden as interrupted:
+                if interrupted.reward_visible:
+                    return
+                continue
+            if not placed:
                 misses += 1
                 rejected.add((move.slot, move.mask))
                 if misses >= 3:
@@ -307,15 +340,22 @@ class RahaiBlocksTask(BaseTask):
                 continue
             misses = 0
             rejected.clear()
-            expected, lines = clear_lines(board.mask | move.mask, board.fixed)
             self.log_info(f"Rahai Blocks: slot={move.slot + 1}, rotation={move.turns * 90}, "
                           f"cell=({move.row + 1},{move.col + 1}), lines={lines}")
             self.sleep(.95 if lines else .38)
+            previous_blast = None
             for _ in range(4):
                 self.next_frame()
                 actual = self._read_board()
-                if actual and actual.mask == expected and actual.fixed == board.fixed:
+                if actual and actual.mask == expected and actual.fixed == board.fixed and not (faults & ~expected):
                     break
+                if lines and (faults or getattr(self, "_rahai_blast_stage", False)):
+                    blast = blast_observation(board, move, expected, actual, fault_mask=faults)
+                    if blast is not None and blast == previous_blast:
+                        self.log_info(f"Rahai Blocks: extra cleared={(expected & ~actual.mask).bit_count()}, "
+                                      f"fault tiles retained={(actual.mask & ~expected).bit_count()}")
+                        break
+                    previous_blast = blast
                 self.sleep(.23)
             else:
                 if lines and self.wait_until(self._reward, time_out=3):

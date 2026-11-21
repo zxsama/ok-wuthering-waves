@@ -215,6 +215,62 @@ def test_release_all_releases_buttons_and_keys_before_shutdown():
     ]
 
 
+def test_click_releases_current_pointer_on_interrupted_wait(monkeypatch):
+    page, _, interaction = make_interaction()
+
+    def interrupt(_delay):
+        raise RuntimeError("wait interrupted")
+
+    monkeypatch.setattr(page, "wait_for_timeout", interrupt)
+    with pytest.raises(RuntimeError, match="wait interrupted"):
+        interaction.click(key="right")
+    interaction.release_all()
+    assert page.events == [("mouse_down", "right"), ("mouse_up", "right")]
+
+
+@pytest.mark.parametrize("gesture", ["swipe", "click"])
+def test_cleanup_retries_failed_gesture_release(gesture, monkeypatch):
+    page, _, interaction = make_interaction()
+
+    def fail_up(*, button):
+        raise RuntimeError("release failed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(page.mouse, "up", fail_up)
+        with pytest.raises(RuntimeError, match="release failed"):
+            if gesture == "click":
+                interaction.click()
+            else:
+                interaction.swipe(0, 0, 30, 30, 0)
+
+    interaction.release_all()
+    interaction.release_all()
+    assert page.events.count(("mouse_down", "left")) == 1
+    assert page.events.count(("mouse_up", "left")) == 1
+    assert page.events[-1] == ("mouse_up", "left")
+
+
+def test_cleanup_observes_inputs_executed_after_dispatch_timeout():
+    page = FakePage()
+    queue = []
+
+    def timed_out(callback):
+        queue.append(callback)
+        raise TimeoutError()
+
+    interaction = PlaywrightBrowserInteraction(timed_out)
+    for operation in (interaction.mouse_down, lambda: interaction.send_key_down("w"), interaction.release_all):
+        with pytest.raises(TimeoutError):
+            operation()
+    for callback in queue:
+        callback(page)
+
+    assert page.events == [
+        ("mouse_down", "left"), ("key_down", "w"),
+        ("mouse_up", "left"), ("key_up", "w"),
+    ]
+
+
 @pytest.mark.parametrize(
     ("args", "message"),
     [

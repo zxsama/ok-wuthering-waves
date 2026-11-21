@@ -9,7 +9,7 @@ from threading import Event, Thread, get_ident
 import pytest
 
 from extensions.cloud.models import CloudPageError, CloudPageState, QueueKind
-from extensions.cloud.playwright_adapter import PlaywrightCloudPageAdapter
+from extensions.cloud.playwright_adapter import PlaywrightCloudPageAdapter, _OwnerCall
 
 
 class FakeLocator:
@@ -227,7 +227,7 @@ def test_close_during_navigation_releases_browser_and_allows_reopen(tmp_path, mo
     page = FakePage()
     adapter, chromium, _ = make_open_adapter(page)
     original_goto = page.goto
-    begin_close = adapter._begin_close
+    begin_close = adapter._begin_close_locked
 
     def wait_for_close(*args, **kwargs):
         navigating.set()
@@ -240,7 +240,7 @@ def test_close_during_navigation_releases_browser_and_allows_reopen(tmp_path, mo
         return result
 
     monkeypatch.setattr(page, "goto", wait_for_close)
-    monkeypatch.setattr(adapter, "_begin_close", signal_close)
+    monkeypatch.setattr(adapter, "_begin_close_locked", signal_close)
     with ThreadPoolExecutor(max_workers=1) as pool:
         opening = pool.submit(adapter.open, url="http://localhost/", profile_dir=tmp_path, visible=False)
         assert navigating.wait(timeout=2)
@@ -299,8 +299,77 @@ def test_call_page_times_out_without_waiting_forever(tmp_path):
     adapter.close()
 
 
-def test_close_times_out_and_rejects_new_calls_while_closing(tmp_path):
+def test_timed_out_queued_inputs_never_reach_the_page(tmp_path):
     adapter, _, _ = make_open_adapter(FakePage())
+    adapter.open(url="https://example.invalid", profile_dir=tmp_path, visible=False)
+    started, release = Event(), Event()
+    inputs = []
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            blocking = pool.submit(adapter.call_page, lambda _: started.set() or release.wait(2))
+            assert started.wait(1)
+            try:
+                adapter.owner_call_timeout_seconds = 0.02
+                for action in ("mouse_down", "key_down"):
+                    with pytest.raises(CloudPageError, match="timed out.*owner call"):
+                        adapter.call_page(lambda _, action=action: inputs.append(action))
+            finally:
+                release.set()
+            assert blocking.result(timeout=1)
+        adapter.owner_call_timeout_seconds = 1
+        adapter.call_page(lambda _: inputs.append("next"))
+        assert inputs == ["next"]
+    finally:
+        adapter.close()
+
+
+def test_owner_checks_deadline_even_if_caller_has_not_cancelled(tmp_path):
+    adapter, _, _ = make_open_adapter(FakePage())
+    adapter.open(url="https://example.invalid", profile_dir=tmp_path, visible=False)
+    expired = Future()
+    called = Event()
+    try:
+        adapter._owner_queue.put(_OwnerCall(called.set, expired, time.monotonic() - 1))
+        with pytest.raises(CloudPageError, match="timed out.*owner call"):
+            expired.result(timeout=1)
+        assert not called.is_set()
+    finally:
+        adapter.close()
+
+
+def test_owner_preserves_callback_timeout_exception(tmp_path):
+    adapter, _, _ = make_open_adapter(FakePage())
+    adapter.open(url="https://example.invalid", profile_dir=tmp_path, visible=False)
+    error = TimeoutError("page callback timed out")
+
+    def fail(_):
+        raise error
+
+    try:
+        with pytest.raises(TimeoutError) as caught:
+            adapter.call_page(fail)
+        assert caught.value is error
+    finally:
+        adapter.close()
+
+
+def test_close_reports_cleanup_error_and_stops_playwright(tmp_path, monkeypatch):
+    adapter, chromium, playwright = make_open_adapter(FakePage())
+    adapter.open(url="https://example.invalid", profile_dir=tmp_path, visible=False)
+    error = TimeoutError("context close timed out")
+
+    def fail():
+        raise error
+
+    monkeypatch.setattr(chromium.context, "close", fail)
+    with pytest.raises(TimeoutError) as caught:
+        adapter.close()
+    assert caught.value is error
+    assert playwright.stop_thread == chromium.launch_threads[0]
+
+
+def test_close_times_out_and_rejects_new_calls_while_closing(tmp_path):
+    adapter, chromium, _ = make_open_adapter(FakePage())
     adapter.owner_close_timeout_seconds = 0.01
     adapter.open(url="https://example.invalid", profile_dir=tmp_path, visible=False)
     release = Event()
@@ -313,6 +382,9 @@ def test_close_times_out_and_rejects_new_calls_while_closing(tmp_path):
     caller.start()
     assert callback_started.wait(timeout=1)
 
+    queued = Future()
+    called = Event()
+    adapter._owner_queue.put(_OwnerCall(called.set, queued, time.monotonic() + 10))
     with pytest.raises(CloudPageError, match="timed out.*owner to close"):
         adapter.close()
     with pytest.raises(CloudPageError, match="owner thread is closing"):
@@ -323,15 +395,23 @@ def test_close_times_out_and_rejects_new_calls_while_closing(tmp_path):
     owner = adapter._owner_thread
     if owner is not None:
         owner.join(timeout=1)
+    with pytest.raises(CloudPageError, match="owner thread is closing"):
+        queued.result(timeout=1)
+    assert not called.is_set()
+    assert chromium.context.close_thread == chromium.launch_threads[0]
 
 
 def test_owner_shutdown_fails_all_pending_futures():
     adapter = PlaywrightCloudPageAdapter()
     pending_one = Future()
     pending_two = Future()
+    cancelled = Future()
+    cancelled.cancel()
     queue = Queue()
-    queue.put((lambda: None, pending_one))
-    queue.put((None, pending_two))
+    queue.put(_OwnerCall(lambda: None, pending_one, 0))
+    queue.put(_OwnerCall(lambda: None, cancelled, 0))
+    queue.put(_OwnerCall(lambda: None, pending_two, 0))
+    queue.put(None)
 
     adapter._fail_pending_owner_calls(queue, CloudPageError("owner stopped"))
 
@@ -339,6 +419,7 @@ def test_owner_shutdown_fails_all_pending_futures():
         pending_one.result()
     with pytest.raises(CloudPageError, match="owner stopped"):
         pending_two.result()
+    assert cancelled.cancelled()
 
 
 def test_owner_dispatcher_timeouts_must_be_positive():

@@ -60,6 +60,13 @@ class CloudPageSelectors:
     media_surface_css: str = "video:visible, canvas:visible"
 
 
+@dataclass(slots=True)
+class _OwnerCall:
+    callback: Callable[[], Any]
+    result: Future[Any]
+    deadline: float
+
+
 class PlaywrightCloudPageAdapter:
     """Drive a persistent system Chrome/Edge session through Playwright."""
 
@@ -113,7 +120,7 @@ class PlaywrightCloudPageAdapter:
         self._context: Any | None = None
         self._page: Any | None = None
         self._owner_thread: Thread | None = None
-        self._owner_queue: Queue[tuple[Callable[[], Any] | None, Future[Any]]] | None = None
+        self._owner_queue: Queue[_OwnerCall | None] | None = None
         self._owner_lock = Lock()
         self._closing = False
         self._close_future: Future[Any] | None = None
@@ -142,8 +149,10 @@ class PlaywrightCloudPageAdapter:
             ready.result(timeout=self.owner_open_timeout_seconds)
         except FutureTimeoutError as exc:
             if ready.done():
-                ready.result()
-            self._begin_close()
+                return ready.result()
+            with self._owner_lock:
+                if self._owner_thread is owner:
+                    self._begin_close_locked()
             raise CloudPageError(
                 "timed out waiting for cloud browser owner to open"
             ) from exc
@@ -182,13 +191,27 @@ class PlaywrightCloudPageAdapter:
 
             self._set_future_result(ready, None)
             while True:
-                callback, result = queue.get()
-                if callback is None:
+                call = queue.get()
+                if call is None:
                     break
+                with self._owner_lock:
+                    if not call.result.set_running_or_notify_cancel():
+                        continue
+                    closing = self._closing
+                if closing:
+                    call.result.set_exception(
+                        CloudPageError("cloud browser owner thread is closing")
+                    )
+                    continue
+                if time.monotonic() >= call.deadline:
+                    call.result.set_exception(
+                        CloudPageError("timed out waiting for cloud browser owner call")
+                    )
+                    continue
                 try:
-                    self._set_future_result(result, callback())
+                    call.result.set_result(call.callback())
                 except BaseException as exc:
-                    self._set_future_exception(result, exc)
+                    call.result.set_exception(exc)
         except BaseException as exc:
             terminal_error = exc
             self._set_future_exception(ready, exc)
@@ -360,37 +383,25 @@ class PlaywrightCloudPageAdapter:
     def close(self) -> None:
         with self._owner_lock:
             owner = self._owner_thread
-        if owner is not None and owner.is_alive():
-            result = self._begin_close()
-            if current_thread() is owner:
+            if owner is None:
+                self._close_resources()
                 return
-            if result is None:
-                owner.join(timeout=self.owner_close_timeout_seconds)
-                if owner.is_alive():
-                    raise CloudPageError(
-                        "timed out waiting for cloud browser owner thread to stop"
-                    )
-                return
-            try:
-                result.result(timeout=self.owner_close_timeout_seconds)
-            except FutureTimeoutError as exc:
-                if result.done():
-                    result.result()
+            result = self._begin_close_locked()
+        if current_thread() is owner:
+            return
+        try:
+            result.result(timeout=self.owner_close_timeout_seconds)
+        except FutureTimeoutError as exc:
+            if not result.done():
                 raise CloudPageError(
                     "timed out waiting for cloud browser owner to close"
                 ) from exc
-            owner.join(timeout=self.owner_close_timeout_seconds)
-            if owner.is_alive():
-                raise CloudPageError(
-                    "timed out waiting for cloud browser owner thread to stop"
-                )
-            return
-        with self._owner_lock:
-            self._owner_thread = None
-            self._owner_queue = None
-            self._close_future = None
-            self._closing = False
-        self._close_resources()
+            result.result()
+        owner.join(timeout=self.owner_close_timeout_seconds)
+        if owner.is_alive():
+            raise CloudPageError(
+                "timed out waiting for cloud browser owner thread to stop"
+            )
 
     def call_page(self, callback: Callable[[Any], Any]) -> Any:
         """Run ``callback`` synchronously on the Playwright owner thread."""
@@ -400,45 +411,34 @@ class PlaywrightCloudPageAdapter:
     def _call_owner(self, callback: Callable[[], Any]) -> Any:
         with self._owner_lock:
             owner = self._owner_thread
-            queue = self._owner_queue
-            closing = self._closing
-        if owner is None or current_thread() is owner:
-            if closing:
+            if self._closing:
                 raise CloudPageError("cloud browser owner thread is closing")
+            dispatch = owner is not None and current_thread() is not owner
+            if dispatch:
+                queue = self._owner_queue
+                if queue is None or not owner.is_alive():
+                    raise CloudPageError("cloud browser owner thread is unavailable")
+                result: Future[Any] = Future()
+                deadline = time.monotonic() + self.owner_call_timeout_seconds
+                queue.put(_OwnerCall(callback, result, deadline))
+        if not dispatch:
             return callback()
-        if closing:
-            raise CloudPageError("cloud browser owner thread is closing")
-        if not owner.is_alive():
-            raise CloudPageError("cloud browser owner thread is unavailable")
-        if queue is None:
-            raise CloudPageError("cloud browser owner thread is unavailable")
-        result: Future[Any] = Future()
-        queue.put((callback, result))
-        if not owner.is_alive():
-            self._set_future_exception(
-                result,
-                CloudPageError("cloud browser owner thread is unavailable"),
-            )
         try:
-            return result.result(timeout=self.owner_call_timeout_seconds)
+            return result.result(timeout=max(0, deadline - time.monotonic()))
         except FutureTimeoutError as exc:
-            if result.done():
+            if not result.cancel() and result.done():
                 return result.result()
             raise CloudPageError(
                 "timed out waiting for cloud browser owner call"
             ) from exc
 
-    def _begin_close(self) -> Future[Any] | None:
-        with self._owner_lock:
-            owner = self._owner_thread
-            queue = self._owner_queue
-            if owner is None or not owner.is_alive() or queue is None:
-                return None
-            self._closing = True
-            if self._close_future is None:
-                self._close_future = Future()
-                queue.put((None, self._close_future))
-            return self._close_future
+    def _begin_close_locked(self) -> Future[Any]:
+        self._closing = True
+        if self._close_future is None:
+            self._close_future = Future()
+            assert self._owner_queue is not None
+            self._owner_queue.put(None)
+        return self._close_future
 
     @staticmethod
     def _set_future_result(future: Future[Any], value: Any) -> None:
@@ -452,15 +452,16 @@ class PlaywrightCloudPageAdapter:
 
     def _fail_pending_owner_calls(
         self,
-        queue: Queue[tuple[Callable[[], Any] | None, Future[Any]]],
+        queue: Queue[_OwnerCall | None],
         exc: BaseException,
     ) -> None:
         while True:
             try:
-                _, result = queue.get_nowait()
+                call = queue.get_nowait()
             except Empty:
                 return
-            self._set_future_exception(result, exc)
+            if call is not None and call.result.set_running_or_notify_cancel():
+                call.result.set_exception(exc)
 
     def _close_resources(self) -> None:
         context, playwright = self._context, self._playwright

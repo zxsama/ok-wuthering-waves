@@ -133,17 +133,34 @@ class PlaywrightBrowserInteraction:
 
     def send_key_down(self, key: Any) -> None:
         mapped = self._map_key(key)
-        with self._lock:
-            self._page_call(lambda page: page.keyboard.down(mapped))
+
+        def action(page: Any) -> None:
             if mapped not in self._held_keys:
                 self._held_keys.append(mapped)
+            page.keyboard.down(mapped)
+
+        with self._lock:
+            self._page_call(action)
 
     def send_key_up(self, key: Any) -> None:
         mapped = self._map_key(key)
         with self._lock:
-            self._page_call(lambda page: page.keyboard.up(mapped))
-            if mapped in self._held_keys:
-                self._held_keys.remove(mapped)
+            self._page_call(lambda page: self._key_up(page, mapped))
+
+    def _key_up(self, page: Any, key: str) -> None:
+        page.keyboard.up(key)
+        if key in self._held_keys:
+            self._held_keys.remove(key)
+
+    def _button_down(self, page: Any, button: str) -> None:
+        if button not in self._held_buttons:
+            self._held_buttons.append(button)
+        page.mouse.down(button=button)
+
+    def _button_up(self, page: Any, button: str) -> None:
+        page.mouse.up(button=button)
+        if button in self._held_buttons:
+            self._held_buttons.remove(button)
 
     def should_capture(self) -> bool:
         return True
@@ -176,8 +193,8 @@ class PlaywrightBrowserInteraction:
             start = bounds.map_point(from_x, from_y, size)
             end = bounds.map_point(to_x, to_y, size)
             page.mouse.move(*start)
-            page.mouse.down(button="left")
             try:
+                self._button_down(page, "left")
                 for step in range(1, steps + 1):
                     ratio = step / steps
                     page.mouse.move(
@@ -189,7 +206,7 @@ class PlaywrightBrowserInteraction:
                 if settle_time:
                     page.wait_for_timeout(settle_time * 1000)
             finally:
-                page.mouse.up(button="left")
+                self._button_up(page, "left")
             return end
 
         with self._lock:
@@ -210,23 +227,19 @@ class PlaywrightBrowserInteraction:
             if point is not None:
                 mapped = self._map_point(page, point)
                 page.mouse.move(*mapped)
-            page.mouse.down(button=button)
+            self._button_down(page, button)
             return mapped
 
         with self._lock:
             mapped = self._page_call(action)
             if mapped is not None:
                 self._cursor_position = mapped
-            if button not in self._held_buttons:
-                self._held_buttons.append(button)
 
     def mouse_up(self, name: str | None = None, key: str = "left") -> None:
         del name
         button = self._map_button(key)
         with self._lock:
-            self._page_call(lambda page: page.mouse.up(button=button))
-            if button in self._held_buttons:
-                self._held_buttons.remove(button)
+            self._page_call(lambda page: self._button_up(page, button))
 
     def move(self, x: float, y: float) -> None:
         if not math.isfinite(x) or not math.isfinite(y):
@@ -260,10 +273,12 @@ class PlaywrightBrowserInteraction:
 
             def action(page: Any) -> tuple[int, int] | None:
                 if point is None:
-                    page.mouse.down(button=button)
-                    if delay:
-                        page.wait_for_timeout(delay)
-                    page.mouse.up(button=button)
+                    try:
+                        self._button_down(page, button)
+                        if delay:
+                            page.wait_for_timeout(delay)
+                    finally:
+                        self._button_up(page, button)
                     return previous
                 bounds, size = self._geometry(page)
                 # The button cap offset scales with the template artwork.
@@ -297,58 +312,37 @@ class PlaywrightBrowserInteraction:
     def release_all_keys(self) -> None:
         """Best-effort release of every key held through this adapter."""
 
-        with self._lock:
-            held = tuple(reversed(self._held_keys))
-            released: list[str] = []
-            errors: list[Exception] = []
-
-            def action(page: Any) -> None:
-                for key in held:
-                    try:
-                        page.keyboard.up(key)
-                        released.append(key)
-                    except Exception as exc:  # Continue to avoid stuck keys.
-                        errors.append(exc)
-
-            self._page_call(action)
-            for key in released:
-                if key in self._held_keys:
-                    self._held_keys.remove(key)
-            if errors:
-                raise CloudPageError(
-                    f"failed to release {len(errors)} browser key(s): {errors[0]}"
-                ) from errors[0]
+        self._release_held(include_buttons=False)
 
     def release_all(self) -> None:
         """Release held mouse buttons and keys before ending a task run."""
 
-        with self._lock:
-            buttons = tuple(reversed(self._held_buttons))
-            released_buttons: list[str] = []
-            errors: list[Exception] = []
+        self._release_held(include_buttons=True)
 
-            def action(page: Any) -> None:
-                for button in buttons:
+    def _release_held(self, *, include_buttons: bool) -> None:
+        def action(page: Any) -> None:
+            # A timed-out call may still run on the owner thread. Read and
+            # update its held inputs on that same thread, in dispatch order.
+            errors = []
+            if include_buttons:
+                for button in tuple(reversed(self._held_buttons)):
                     try:
-                        page.mouse.up(button=button)
-                        released_buttons.append(button)
+                        self._button_up(page, button)
                     except Exception as exc:
                         errors.append(exc)
-                for key in tuple(reversed(self._held_keys)):
-                    try:
-                        page.keyboard.up(key)
-                        self._held_keys.remove(key)
-                    except Exception as exc:
-                        errors.append(exc)
-
-            self._page_call(action)
-            for button in released_buttons:
-                if button in self._held_buttons:
-                    self._held_buttons.remove(button)
+            for key in tuple(reversed(self._held_keys)):
+                try:
+                    self._key_up(page, key)
+                except Exception as exc:
+                    errors.append(exc)
             if errors:
+                kind = "input" if include_buttons else "key"
                 raise CloudPageError(
-                    f"failed to release {len(errors)} browser input(s): {errors[0]}"
+                    f"failed to release {len(errors)} browser {kind}(s): {errors[0]}"
                 ) from errors[0]
+
+        with self._lock:
+            self._page_call(action)
 
     def on_destroy(self) -> None:
         self.release_all()
