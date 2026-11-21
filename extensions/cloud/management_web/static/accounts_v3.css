@@ -1,0 +1,54 @@
+.acct-page {
+  --acct-border: var(--stroke, color-mix(in srgb, currentColor 18%, transparent));
+  --acct-surface: var(--card-bg, color-mix(in srgb, currentColor 3%, transparent));
+  color: inherit;
+  max-width: 1040px;
+  margin-inline: auto;
+}
+.acct-header, .acct-actions, .acct-toggle, .acct-options, .acct-value {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .55rem;
+}
+.acct-header { justify-content: space-between; gap: 1rem; }
+.acct-header h2 { font-size: 1.4rem; margin: 0; }
+.acct-page button, .acct-page select, .acct-page textarea, .acct-page input:not([type=checkbox]) {
+  border: 1px solid var(--acct-border);
+  border-radius: 6px;
+  padding: .45rem .7rem;
+  background: var(--acct-surface);
+  color: inherit;
+  font: inherit;
+}
+.acct-page select option { color: CanvasText; background: Canvas; }
+.acct-page button { cursor: pointer; }
+.acct-page button:hover:enabled { border-color: currentColor; }
+.acct-page button:disabled { opacity: .48; cursor: default; }
+.acct-page .acct-primary {
+  color: var(--accent-fg, white);
+  background: var(--accent, #376b68);
+  border-color: transparent;
+}
+:root[data-theme="dark"] .acct-page .acct-primary { color: #171221; }
+.acct-page :focus-visible { outline: 2px solid var(--accent, #376b68); outline-offset: 2px; }
+.acct-hint, .acct-field small, .acct-card summary span, .acct-card summary small, .acct-empty { opacity: .75; }
+.acct-feedback:empty { display: none; }
+.acct-status, .acct-feedback:not(:empty) { padding: .65rem .9rem; background: var(--acct-surface); border-radius: 6px; }
+.acct-form { min-width: 0; border: 0; padding: 0; margin: 0; }
+.acct-cards { display: grid; gap: .65rem; margin: .9rem 0; }
+.acct-card, .acct-empty { background: var(--acct-surface); border: 1px solid var(--acct-border); border-radius: 9px; }
+.acct-empty { padding: 1.2rem; margin: 0; text-align: center; }
+.acct-card summary { cursor: pointer; padding: .85rem 1rem; }
+.acct-card summary span, .acct-card summary small { margin-inline-start: 1rem; }
+.acct-body { border-top: 1px solid var(--acct-border); padding: 1rem; display: grid; gap: .9rem; }
+.acct-field, .acct-task-fields, .acct-values { display: grid; align-content: start; gap: .35rem; min-width: 0; }
+.acct-task-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 1rem; }
+.acct-field > :is(input, textarea, select):not([type=checkbox]) { box-sizing: border-box; width: 100%; }
+.acct-field > input[type=checkbox] { justify-self: start; }
+.acct-field textarea { min-height: 4rem; resize: vertical; }
+.acct-options label, .acct-toggle { display: inline-flex; align-items: center; gap: .35rem; }
+.acct-value { justify-content: space-between; }
+@media (max-width: 560px) {
+  .acct-card summary span, .acct-card summary small { display: block; margin: .25rem 0 0 1rem; }
+}

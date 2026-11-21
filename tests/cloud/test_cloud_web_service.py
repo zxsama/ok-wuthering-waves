@@ -114,7 +114,7 @@ def test_web_config_keeps_upstream_tasks_and_adds_character_team_tab(tmp_path):
     ]
     assert result["config_folder"] == str(tmp_path / "configs")
     assert "gui" not in result
-    assert "gui_icon" not in result
+    assert result["gui_icon"] == "icons/icon.png"
     assert "update_pyappify" not in result
 
 
@@ -136,7 +136,8 @@ def test_cloud_runtime_reports_updates_as_unsupported():
 
     _disable_cloud_update_checks(runtime, {"version": "v1.0.2"})
 
-    assert runtime.about() == {"update_supported": False, "name": "OK-WW"}
+    assert runtime.about() == {"update_supported": False, "name": "OK-WW",
+                               "version": _running_version({"version": "v1.0.2"})}
     assert runtime.check_for_updates() == {
         "current_version": "v1.0.2",
         "versions": [],
@@ -160,44 +161,25 @@ def test_running_version_uses_packaged_release_when_build_metadata_is_dev(monkey
     assert _running_version({"version": "dev"}) == packaged_version
 
 
-def test_cloud_game_button_does_not_cover_header_actions():
-    result = _inject_default_web_language(
-        '<html><script type="module" src="/static/app.js"></script></html>',
-        "zh_CN",
-    )
+def test_cloud_index_has_single_workspace_with_shared_run_controls():
+    from html.parser import HTMLParser
 
-    assert "right:20px;bottom:20px" in result
-    assert "right:20px;top:14px" not in result
+    class Elements(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            attributes = dict(attrs)
+            if element_id := attributes.get("id"):
+                elements[element_id] = tag
+            if tag == "script" and attributes.get("type") == "module":
+                entrypoints.append(attributes["src"])
 
-
-def test_docker_update_control_is_next_to_cloud_button_with_overlay_version():
-    result = _inject_default_web_language(
-        '<html><script type="module" src="/static/app.js"></script></html>',
-        "zh_CN",
-    )
-
-    assert "okww-cloud-controls" in result
-    assert "okww-docker-update" in result
-    assert "更新 Git / Docker" in result
-    assert "okww-docker-version" in result
-    assert "position:absolute;right:0;top:calc(100% + 3px);opacity:.55" in result
-    assert "headers:{'X-OK-WW-Update':'1'}" in result
-    assert "busy||state.task_running||state.game_running" in result
-
-
-def test_schedule_form_adds_default_enabled_email_report_option():
-    result = _inject_default_web_language(
-        '<html><script type="module" src="/static/app.js"></script></html>',
-        "zh_CN",
-    )
-
-    assert "Send Email Report After Task" in result
-    assert "任务完成后发送邮件汇报" in result
-    assert "body.email_report" in result
-    assert "input.checked=true" in result
-    assert "task.path===okwwEditingSchedulePath" in result
-    assert "okwwTranslations[task.name]===disabled.value" in result
-    assert "input.disabled=true" in result
+    elements, entrypoints = {}, []
+    index = Path(__file__).resolve().parents[2] / "extensions/cloud/management_web/static/index.html"
+    Elements().feed(_inject_default_web_language(index.read_text(encoding="utf-8"), "zh_CN"))
+    assert entrypoints == ["/static/workspace.js"]
+    assert elements["workspace-nav"] == "nav"
+    assert elements["workspace-page"] == "main"
+    assert elements["okww-cloud-game-control"] == elements["okww-docker-update"] == "button"
+    assert "okww-docker-version" in elements
 
 
 def test_schedule_update_preserves_upstream_validation_and_stable_identifier():
@@ -263,6 +245,7 @@ def test_schedule_update_rejects_unavailable_task_index():
     runtime = SimpleNamespace(
         executor=SimpleNamespace(onetime_tasks=[]),
         schedule_manager=manager,
+        schedule_tasks=lambda: {"tasks": []},
     )
     _install_schedule_email_support(runtime)
 
@@ -335,12 +318,7 @@ def test_default_web_language_bootstrap_preserves_saved_choice():
     assert "zh_CN" in result
     assert "Create Team" in result
     assert "创建队伍" in result
-    assert "MutationObserver" in result
-    assert "zh-hans" in result
-    assert "WeakMap" not in result
-    assert "characterData:true" not in result
-    assert "okwwReverseTranslations" not in result
-    assert "okww-cloud-game-control" in result
+    assert "globalThis.okwwTranslations=" in result
     assert "启动云游戏" in result
 
 
@@ -870,3 +848,14 @@ def test_task_cannot_share_browser_with_unfinished_manual_start():
     with pytest.raises(RuntimeError, match="still starting or stopping"):
         controller.start_task("DailyTask")
     assert session.starts == []
+
+def test_run_bar_resumes_executor_only_after_cloud_game_reaches_in_game():
+    runtime, *_ = make_runtime(SimpleNamespace(name="Task"))
+    session = FakeSession()
+    steps = []
+    runtime.pause = lambda: steps.append(("pause", session.state))
+    runtime.resume = lambda: steps.append(("resume", session.state))
+    controller = CloudWebController(runtime, session, SimpleNamespace())
+    controller.start_game_manually(run_executor=True)
+    controller._manual_game_thread.join(2)
+    assert steps == [("pause", "closed"), ("resume", "in_game")]

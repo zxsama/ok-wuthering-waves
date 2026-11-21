@@ -70,3 +70,18 @@ def test_cloud_ok_registers_local_tabs_once_without_mutating_source(monkeypatch)
 
     assert captured[0]["onetime_tasks"] == [entry]
     assert config["onetime_tasks"] == []
+
+def test_section_reset_preserves_other_settings_and_includes_inactive_children():
+    from extensions.cloud.management_web.app import WebRuntime
+
+    option = SimpleNamespace(
+        config_type={"Mode": {"group": "Capture", "sub_configs": {True: ["Quality"]}},
+                     "Other setting": {"group": "Window"}},
+        default_config={"Mode": True, "Quality": 3, "Other setting": 1},
+    )
+    config = {"Mode": False, "Quality": 8, "Other setting": 5}
+    store = SimpleNamespace(get_config=lambda _: config, get_all_visible_configs=lambda: [("Options", config, option)])
+    runtime = object.__new__(WebRuntime)
+    runtime.ok = SimpleNamespace(task_executor=SimpleNamespace(global_config=store))
+    runtime.reset_settings("Options", "Capture")
+    assert config == {"Mode": True, "Quality": 3, "Other setting": 5}

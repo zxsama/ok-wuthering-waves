@@ -1,17 +1,34 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#251e22" />
-    <meta name="description" content="Local control surface for ok-script automation" />
-    <title>ok-script control center</title>
-    <script type="module" crossorigin src="/static/app.js"></script>
-    <link rel="modulepreload" crossorigin href="/static/chunk-react.js">
-    <link rel="modulepreload" crossorigin href="/static/chunk-fluent.js">
-    <link rel="stylesheet" crossorigin href="/static/index.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OK-WW</title>
+  <link rel="icon" href="/static/app-icon.png">
+  <link rel="stylesheet" href="/static/index.css">
+  <link rel="stylesheet" href="/static/workspace.css">
+  <link rel="stylesheet" href="/static/tasks_v3.css">
+  <script type="module" src="/static/workspace.js"></script>
+</head>
+<body>
+  <header class="runbar">
+    <div class="brand"><button id="nav-toggle" aria-controls="workspace-nav" data-label="Navigation">☰</button><img src="/static/app-icon.png" alt=""><strong>OK-WW</strong></div>
+    <button id="connection" aria-haspopup="dialog" data-label="Connection"><span class="signal"></span><span id="connection-text"></span></button>
+    <span id="runtime-state" role="status"></span>
+    <button id="executor" disabled></button>
+    <button id="cancel-task" hidden data-text="Cancel this task"></button>
+    <div id="cloud-controls" hidden>
+      <button id="okww-cloud-game-control" disabled data-text="Start Cloud Game"></button>
+      <button id="okww-docker-update" disabled data-text="Update Docker"></button>
+      <small id="okww-docker-version"></small>
+    </div>
+  </header>
+  <div class="workspace-grid">
+    <nav id="workspace-nav" aria-label="Navigation"></nav>
+    <main id="workspace-page" tabindex="-1" aria-busy="true"></main>
+  </div>
+  <dialog id="device-dialog"><header><h2 data-text="Connection"></h2><button type="button" data-close data-label="Close">×</button></header><div id="device-fields"></div><footer><button id="refresh-devices" data-text="Refresh"></button></footer></dialog>
+  <dialog id="unsaved-dialog"><h2 data-text="Save Changes"></h2><p data-text="The current task has unsaved changes. Do you want to save them?"></p><footer><button data-close data-text="Cancel"></button><button id="discard" data-text="Don't Save"></button><button id="save" data-text="Save"></button></footer></dialog>
+  <div class="workspace-toasts" aria-live="polite"></div>
+</body>
 </html>

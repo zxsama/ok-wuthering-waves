@@ -1,0 +1,105 @@
+.dt-page {
+    --dt-border: var(--stroke, color-mix(in srgb, currentColor 16%, transparent));
+    --dt-surface: var(--card-bg, color-mix(in srgb, currentColor 3%, transparent));
+    --dt-muted: var(--text-muted, color-mix(in srgb, currentColor 70%, transparent));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    height: 100%;
+    box-sizing: border-box;
+    color: inherit;
+}
+.dt-page [hidden] { display: none !important; }
+.dt-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.dt-page h1, .dt-page h2 { color: inherit; line-height: 1.25; margin: 0; }
+.dt-page h1 { margin-inline-end: auto; font-size: 24px; font-weight: 600; }
+.dt-page h2 { font-size: 16px; font-weight: 600; }
+.dt-toolbar h2 { margin-inline-end: auto; }
+.dt-page button, .dt-page select, .dt-page input, .dt-page .dt-link {
+    box-sizing: border-box;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+    border: 1px solid var(--dt-border);
+    border-radius: 6px;
+    background: var(--dt-surface);
+    color: inherit;
+}
+.dt-page select option { color: CanvasText; background-color: Canvas; }
+.dt-page input[type=search] { flex: 1 1 140px; max-width: 500px; min-width: 80px; }
+.dt-page button, .dt-page .dt-link { cursor: pointer; }
+.dt-page .dt-link { text-decoration: none; }
+.dt-page button:disabled { opacity: .45; cursor: default; }
+.dt-page button:hover:enabled, .dt-page .dt-link:hover {
+    background: color-mix(in srgb, currentColor 8%, var(--dt-surface));
+}
+.dt-page button.dt-primary { background: var(--accent, #7c5cff); color: var(--page-bg, white); border-color: transparent; }
+.dt-page .dt-primary:hover:enabled { background: color-mix(in srgb, white 10%, var(--accent, #7c5cff)); }
+.dt-page button[aria-pressed=true] { border-color: var(--accent, #7c5cff); }
+.dt-log, .dt-threads pre {
+    font: 13px/1.6 "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    white-space: pre;
+    tab-size: 4;
+}
+.dt-log {
+    flex: 1 1 auto;
+    min-height: 220px;
+    height: calc(100dvh - 245px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    border-radius: 8px;
+    background: var(--dt-surface);
+    border: 1px solid var(--dt-border);
+    padding: 10px 12px;
+    box-sizing: border-box;
+}
+.dt-debug, .dt-empty-log, .dt-status { color: var(--dt-muted); }
+.dt-warning { color: var(--warning, #b87b17); }
+.dt-error, .dt-critical { color: var(--danger, #dc5555); }
+.dt-critical { font-weight: 600; }
+.dt-status { font-size: 12px; }
+.dt-status:empty { display: none; }
+.dt-diagnosis-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(175px, 27%); flex: 1; gap: 12px; min-height: 0; }
+.dt-viewer, .dt-history {
+    padding: 12px; min-width: 0; border: 1px solid var(--dt-border);
+    border-radius: 8px; background: var(--dt-surface); box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.dt-viewer h2 { overflow-wrap: anywhere; }
+.dt-frame {
+    display: grid; place-items: center; min-height: 200px; flex: 1;
+    background: color-mix(in srgb, currentColor 4%, transparent); border-radius: 6px;
+    overflow: hidden;
+}
+.dt-frame p { padding: 12px; color: var(--dt-muted); font-size: 14px; text-align: center; }
+.dt-frame img { display: block; max-width: 100%; max-height: max(250px, 62dvh); object-fit: contain; }
+.dt-viewer .dt-link { margin-inline-start: auto; }
+.dt-shot-list { display: flex; flex-direction: column; overflow-y: auto; min-height: 0; max-height: 65dvh; gap: 3px; }
+.dt-shot-list button {
+    display: flex; flex-direction: column; align-items: flex-start; text-align: start;
+    gap: 3px; padding: 8px; background: transparent; border-color: transparent; word-break: break-word;
+}
+.dt-shot-list button[aria-pressed=true] {
+    background: color-mix(in srgb, var(--accent, #7c5cff) 11%, transparent);
+    border-color: transparent;
+    box-shadow: inset 3px 0 0 var(--accent, #7c5cff);
+}
+.dt-shot-list small { color: var(--dt-muted); font-size: 11px; }
+.dt-threads {
+    width: min(720px, 90vw); max-height: 75dvh; overflow: auto; box-sizing: border-box;
+    border: 1px solid var(--dt-border); border-radius: 10px; padding: 16px;
+    background: var(--card-bg, Canvas); color: var(--ink, CanvasText);
+}
+.dt-threads::backdrop { background: rgb(0 0 0 / .5); }
+.dt-threads .dt-toolbar { margin-bottom: 12px; }
+.dt-threads details { border-top: 1px solid var(--dt-border); padding-block: 8px; }
+.dt-threads summary { cursor: pointer; }
+.dt-threads pre { overflow-x: auto; }
+@media (max-width: 760px) {
+    .dt-diagnosis-body { grid-template-columns: minmax(0, 1fr); }
+    .dt-shot-list { max-height: 240px; }
+    .dt-toolbar h1 { width: 100%; }
+    .dt-log { height: 58dvh; }
+}

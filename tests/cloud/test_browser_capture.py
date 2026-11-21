@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+from types import SimpleNamespace
+
 import cv2
 import numpy as np
 import pytest
@@ -53,6 +57,44 @@ def test_capture_returns_fixed_16_9_bgr_frame_from_page_screenshot():
     assert page.screenshot_calls == [{"type": "png", "full_page": False}]
     assert capture.width == 160
     assert capture.height == 90
+
+
+def test_task_executor_next_frame_accepts_cloud_capture():
+    from ok.task.TaskExecutor import TaskExecutor
+
+    frame = np.full((90, 160, 3), 32, dtype=np.uint8)
+    capture = PlaywrightBrowserCapture(FakePage([png(frame)]), output_size=(160, 90))
+    executor = SimpleNamespace(
+        method=capture, reset_scene=lambda: None, check_enabled=lambda: None,
+        exit_event=Event(), can_capture=lambda: True, blur_overlay_processor=None,
+    )
+    assert np.array_equal(TaskExecutor.next_frame(executor), frame)
+
+
+def test_capture_contention_honors_busy_wait_and_releases_after_failure():
+    entered = Event()
+    release = Event()
+    frame = np.full((90, 160, 3), 32, dtype=np.uint8)
+
+    class BlockingPage(FakePage):
+        def screenshot(self, **kwargs):
+            entered.set()
+            assert release.wait(timeout=3)
+            return super().screenshot(**kwargs)
+
+    capture = PlaywrightBrowserCapture(BlockingPage([RuntimeError("capture lost"), png(frame)]), output_size=(160, 90))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(capture.get_frame)
+        try:
+            assert entered.wait(timeout=3)
+            assert capture.get_frame() is None
+            assert capture.get_frame(busy_wait=0.01) is None
+            waiting = pool.submit(capture.get_frame, busy_wait=2)
+        finally:
+            release.set()
+        with pytest.raises(BrowserCaptureError):
+            first.result(timeout=3)
+        assert np.array_equal(waiting.result(timeout=3), frame)
 
 
 def test_tall_screenshot_is_center_cropped_before_resizing():

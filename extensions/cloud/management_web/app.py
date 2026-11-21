@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import io
 import json
 import logging
 import os
 import re
 import secrets
-import shutil
 import threading
 import tempfile
 import zipfile
+from collections import Counter
 from contextlib import asynccontextmanager
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from ok.core.events import EventMessage, communicate
 from ok.core.capture_labels import capture_method_label
@@ -30,6 +33,8 @@ LOG_LINE_PATTERN = re.compile(
 LOG_LEVELS = {"ALL": 0, "DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
 SCRIPT_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.py$")
 EVENT_SESSION_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+TASK_ARTWORK_DIR = Path(__file__).resolve().parents[3] / "icons" / "tasks"
+TASK_ARTWORK_SUFFIXES = {".png", ".svg"}
 logger = logging.getLogger(__name__)
 
 
@@ -182,25 +187,16 @@ def _windows_system_accents():
         return None
 
 
-def _copy_web_icon(config, static_dir):
-    """Copy the configured application icon into the served web assets."""
+def _web_icon_path(config):
+    """Serve the configured icon without modifying packaged assets."""
     configured = config.get("gui_icon")
     if not configured or str(configured).startswith(":/"):
         return None
-
     source = Path(configured)
     if not source.is_absolute():
         from ok.util.file import get_path_relative_to_exe
         source = Path(get_path_relative_to_exe(str(configured)))
-    if not source.is_file():
-        return None
-
-    static_dir.mkdir(parents=True, exist_ok=True)
-    suffix = source.suffix.lower() or ".ico"
-    destination = static_dir / f"app-icon{suffix}"
-    if source.resolve() != destination.resolve():
-        shutil.copy2(source, destination)
-    return f"/static/{destination.name}?version={destination.stat().st_mtime_ns}"
+    return source if source.is_file() else None
 
 
 def _json_value(value: Any):
@@ -249,6 +245,58 @@ def _config_fields(config, descriptions=None, config_types=None, defaults=None):
         config, descriptions, config_types, defaults, serialize=_json_value)
 
 
+_NOTIFICATION_CREDENTIALS = {
+    "Discord Webhook", "Telegram Bot Token", "Enterprise WeChat Webhook URL",
+    "QQ Bot API Token", "SMTP Password",
+}
+
+
+def _config_sections(config, option):
+    """Mirror the Qt settings anchors, including inactive child rows."""
+    types = getattr(option, "config_type", None) or {}
+    named = {key: spec["group"] for key, spec in types.items()
+             if isinstance(spec, dict) and spec.get("group")}
+    if not named:
+        return {}
+    parents = {}
+    for key, spec in types.items():
+        rules = spec.get("sub_configs") if isinstance(spec, dict) else None
+        if isinstance(rules, dict):
+            for children in rules.values():
+                for child in [children] if isinstance(children, str) else children or []:
+                    parents.setdefault(child, key)
+    sections = {}
+    for field in dict.fromkeys([*config, *types]):
+        if str(field).startswith("_"):
+            continue
+        key, seen = field, set()
+        while key not in named and key in parents and key not in seen:
+            seen.add(key)
+            key = parents[key]
+        sections[field] = named.get(key, "Other")
+    return sections
+
+
+def _settings_fields(name, config, option):
+    fields = _config_fields(
+        config, getattr(option, "config_description", None),
+        getattr(option, "config_type", None), getattr(option, "default_config", None),
+    )
+    if name == "Notification":
+        for index, field in enumerate(fields):
+            if field["key"] in _NOTIFICATION_CREDENTIALS:
+                fields[index] = {
+                    "key": field["key"], "description": field["description"],
+                    "sub_config": field["sub_config"], "kind": "secret",
+                    "configured": bool(config.get(field["key"])),
+                }
+    sections = _config_sections(config, option)
+    for field in fields:
+        if field["key"] in sections:
+            field["section"] = sections[field["key"]]
+    return fields
+
+
 def _task_config_fields(task):
     """Return the editable config surface exposed by the Qt ConfigCard."""
     return _config_fields(
@@ -259,7 +307,81 @@ def _task_config_fields(task):
     )
 
 
+def _task_artwork_url(source):
+    if not isinstance(source, (str, Path)):
+        return None
+    image = Path(source).resolve()
+    if image.parent == TASK_ARTWORK_DIR and image.suffix.lower() in TASK_ARTWORK_SUFFIXES and image.is_file():
+        return f"/task-artwork/{quote(image.name)}"
+    return None
+
+
+def _editable_task_script(manager, task):
+    """Match the Qt editor's task_map entry to a file served by the web script editor."""
+    folder = getattr(manager, "task_folder", None)
+    if not folder or not getattr(task, "is_custom", False):
+        return None
+    entry = manager.task_map.get(task)
+    if entry and entry[0]:
+        path = Path(entry[0]).resolve()
+        if path.parent == Path(folder).resolve() and SCRIPT_NAME_PATTERN.fullmatch(path.name) and path.is_file():
+            return path.name
+    return None
+
+
+@lru_cache(maxsize=64)
+def _task_artwork_png(path, mtime_ns):
+    """Fit the same alpha bounds as the desktop icon renderer."""
+    from PIL import Image
+
+    with Image.open(path) as source:
+        image = source.convert("RGBA")
+    bounds = image.getchannel("A").point(lambda alpha: 255 if alpha >= 16 else 0).getbbox()
+    result = io.BytesIO()
+    (image.crop(bounds) if bounds else image).save(result, format="PNG")
+    return result.getvalue()
+
+
+def _task_page_fields(task, fields):
+    """Put active child rows immediately after their parent, as in ConfigForm."""
+    from ok.core.config_schema import normalize_config_keys
+
+    types = getattr(task, "config_type", None) or {}
+    by_key = {item["key"]: item for item in fields}
+    ordered = {}
+
+    def add(key):
+        if key in ordered or key not in by_key:
+            return
+        field = by_key[key]
+        ordered[key] = field
+        spec = types.get(key)
+        spec = spec if isinstance(spec, dict) else {}
+        if field["kind"] in {"integer", "number"}:
+            decimal = field["kind"] == "number"
+            if field["minimum"] is None:
+                default = field["default"] or 0
+                field["minimum"] = -999999999.0 if decimal else (-999999 if default < 0 else int(default > 0))
+            if field["maximum"] is None:
+                field["maximum"] = 999999999.0 if decimal else 99999999
+            field["step"] = spec.get("step", 0.1 if decimal else 1)
+        rules = spec.get("sub_configs") or {}
+        if rules:
+            choices = field["value"] if isinstance(field["value"], list) else [field["value"]]
+            for choice in choices:
+                if isinstance(choice, (bool, str, int, float)):
+                    for child in normalize_config_keys(rules.get(choice)):
+                        add(child)
+
+    for field in fields:
+        if not field["sub_config"]:
+            add(field["key"])
+    return list(ordered.values())
+
+
 def _task_payload(task):
+    from .accounts import public_task_info
+
     waiting_for = task.executor.waiting_for_task(task) if task in task.executor.onetime_tasks else None
     return {
         "name": task.name,
@@ -274,7 +396,7 @@ def _task_payload(task):
         "instructions": getattr(task, "instructions", None),
         "waiting_for": waiting_for.name if waiting_for else None,
         "start_time": float(getattr(task, "start_time", 0) or 0),
-        "info": _json_value(getattr(task, "info", {}) or {}),
+        "info": _json_value(public_task_info(task, getattr(task, "info", {}) or {})),
         "config": _task_config_fields(task),
     }
 
@@ -573,6 +695,55 @@ class WebRuntime:
     def tasks(self):
         return [_task_payload(task) for task in self.executor.get_all_tasks()]
 
+    def task_page(self, *, cloud=False, script=None):
+        """Qt TasksPage data, without creating any Qt widgets in the cloud process."""
+        from .accounts import CLOUD_ACCOUNT_SWITCH_UNAVAILABLE, is_multi_account_task
+
+        config = self.ok.config
+        icons = config.get("task_category_icons", {})
+        colors = config.get("task_category_colors", {})
+        categories = {
+            key: {"name": label, "icon": _task_artwork_url(icons.get(key)), "color": colors.get(key)}
+            for key, label in (("all", "All"), ("onetime", "On-demand"), ("trigger", "Triggers"))
+        }
+        manager = self.task_manager
+        scripts = getattr(manager, "imported_scripts", {}) or {}
+        registered = (*self.executor.onetime_tasks, *self.executor.trigger_tasks)
+        name_counts = Counter(task.name.casefold() for task in registered)
+        if script is None:
+            imported = {entry["script_name"] for entry in scripts.values() if entry.get("script_name")}
+            candidates = [task for task in registered
+                          if getattr(task, "group_name", None) not in imported]
+        else:
+            if script not in scripts:
+                return None
+            candidates = sorted(scripts[script].get("tasks", ()), key=lambda task: task in self.executor.trigger_tasks)
+        controller = getattr(getattr(self.ok, "headless_app", None), "start_controller", None)
+        pending = getattr(controller, "is_task_pending", None)
+        tasks = []
+        for task in candidates:
+            group = getattr(task, "group_name", None)
+            if not getattr(task, "visible", True):
+                continue
+            data = _task_payload(task)
+            if group and f"group:{group}" not in categories:
+                categories[f"group:{group}"] = {
+                    "name": group, "icon": _task_artwork_url(getattr(task, "group_icon", None)),
+                    "color": colors.get(f"group:{group}"),
+                }
+            data.update({
+                "id": task.name if name_counts[task.name.casefold()] == 1 else f"{type(task).__module__}.{type(task).__name__}",
+                "icon": _task_artwork_url(getattr(task, "icon", None)),
+                "pending": bool(pending and pending(task)),
+                "first_run_alert": None if (task.config or {}).get("_first_run_alert") else getattr(task, "first_run_alert", None),
+                "resettable": bool(getattr(task, "default_config", None)),
+                "script_file": _editable_task_script(manager, task),
+                "run_unavailable": CLOUD_ACCOUNT_SWITCH_UNAVAILABLE if cloud and is_multi_account_task(task) else None,
+                "config": _task_page_fields(task, data["config"]),
+            })
+            tasks.append(data)
+        return {"tasks": tasks, "categories": categories}
+
     def settings(self):
         """Return global config groups and whether Qt shows them as tabs."""
         from ok.util.GlobalConfig import APP_LAUNCHER_OPTION_NAME
@@ -584,12 +755,7 @@ class WebRuntime:
             "description": str(getattr(option, "description", "") or ""),
             "expanded": name == "Basic Options",
             "top_level": bool(getattr(option, "show_at_tab", False)),
-            "fields": _config_fields(
-                config,
-                getattr(option, "config_description", None),
-                getattr(option, "config_type", None),
-                getattr(option, "default_config", None),
-            ),
+            "fields": _settings_fields(name, config, option),
         } for name, config, option in groups]
 
     def set_setting(self, group, key, value):
@@ -597,14 +763,30 @@ class WebRuntime:
         if key.startswith("_") or key not in config:
             raise ValueError(f"Unknown setting: {key}")
         previous = config.get(key)
+        if group == "Notification" and key in _NOTIFICATION_CREDENTIALS:
+            if isinstance(value, dict) and set(value) == {"clear"} and value["clear"] is True:
+                value = ""
+            elif not isinstance(value, str):
+                raise ValueError("Expected a credential or an explicit clear request")
+            elif not value.strip():
+                return next(item for item in self.settings() if item["name"] == group)
         config[key] = value
         if config.get(key) == previous and value != previous:
             raise ValueError(f"Invalid value for {key}")
         return next(item for item in self.settings() if item["name"] == group)
 
-    def reset_settings(self, group):
+    def reset_settings(self, group, section=None):
         config = self.executor.global_config.get_config(group)
-        config.reset_to_default()
+        if section is None:
+            config.reset_to_default()
+        else:
+            option = next(opt for name, _, opt in self.executor.global_config.get_all_visible_configs() if name == group)
+            sections = _config_sections(config, option)
+            if section not in sections.values():
+                raise ValueError("Unknown settings section")
+            for key, name in sections.items():
+                if name == section and key in option.default_config:
+                    config[key] = option.default_config[key]
         return next(item for item in self.settings() if item["name"] == group)
 
     def navigation(self):
@@ -612,13 +794,22 @@ class WebRuntime:
         trigger_tasks = list(self.executor.trigger_tasks or [])
         onetime_tasks = list(self.executor.onetime_tasks or [])
         manager = self.task_manager
+        scripts = getattr(manager, "imported_scripts", {}) or {}
+        imported = {entry["script_name"] for entry in scripts.values() if entry.get("script_name")}
         return {
+            "tasks_page": any(getattr(task, "visible", True) and getattr(task, "group_name", None) not in imported
+                              for task in onetime_tasks + trigger_tasks),
             "triggers": any(task in trigger_tasks and getattr(task, "visible", True) for task in tasks),
             "tasks": any(task in onetime_tasks and getattr(task, "visible", True) for task in tasks),
             "script": bool(manager and getattr(manager, "has_custom", False)),
             "templates": bool((manager and getattr(manager, "has_custom", False)) or self.ok.config.get("debug")),
-            "schedule": any(getattr(task, "support_schedule_task", False) and getattr(task, "visible", True) for task in tasks),
+            "schedule": any(getattr(task, "support_schedule_task", False) for task in onetime_tasks),
             "task_tabs": self.task_tabs(),
+            "imported_task_pages": [
+                {"id": namespace, "name": entry.get("script_name") or namespace}
+                for namespace, entry in scripts.items()
+                if any(getattr(task, "visible", True) for task in entry.get("tasks", ()))
+            ],
         }
 
     def task_tabs(self):
@@ -1112,8 +1303,14 @@ class WebRuntime:
         elif action == "pause" and not is_trigger:
             task.pause()
         elif action == "stop" and not is_trigger:
+            controller = getattr(getattr(self.ok, "headless_app", None), "start_controller", None)
+            pending = getattr(controller, "is_task_pending", None)
+            if pending and pending(task):
+                controller.cancel_task(task)
             task.disable()
             task.unpause()
+        elif action == "acknowledge" and not is_trigger and getattr(task, "first_run_alert", None):
+            task.config["_first_run_alert"] = task.first_run_alert
         elif action == "resume" and not is_trigger and task.enabled and task.paused:
             task.unpause()
         else:
@@ -1157,7 +1354,7 @@ def create_web_app(config, ok_instance=None):
     check_web_requirements()
     try:
         from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-        from fastapi.responses import FileResponse
+        from fastapi.responses import FileResponse, Response
         from fastapi.staticfiles import StaticFiles
     except ImportError as exc:
         raise SystemExit(WEB_REQUIREMENTS_MESSAGE) from exc
@@ -1167,7 +1364,8 @@ def create_web_app(config, ok_instance=None):
     globals()["Request"] = Request
 
     static_dir = Path(__file__).with_name("static")
-    icon_url = _copy_web_icon(config, static_dir)
+    icon_path = _web_icon_path(config)
+    icon_url = '/api/app-icon' if icon_path else '/static/app-icon.png'
     runtime = WebRuntime(config, icon_url=icon_url, ok_instance=ok_instance)
     runtime._task_tabs = register_task_tabs(runtime.executor.get_all_tasks())
     event_sessions = _EventSessionRegistry()
@@ -1192,6 +1390,11 @@ def create_web_app(config, ok_instance=None):
     @app.get("/")
     async def index():
         return FileResponse(static_dir / "index.html")
+
+    if icon_path:
+        @app.get("/api/app-icon", include_in_schema=False)
+        async def app_icon():
+            return FileResponse(icon_path)
 
     @app.get("/api/status")
     async def status():
@@ -1270,6 +1473,22 @@ def create_web_app(config, ok_instance=None):
     @app.get("/api/tasks")
     async def tasks():
         return runtime.tasks()
+
+    @app.get("/api/tasks/page")
+    async def task_page(script: str | None = None):
+        page = runtime.task_page(cloud=getattr(app.state, "cloud_controller", None) is not None, script=script)
+        if page is None:
+            raise HTTPException(status_code=404, detail="Imported task page not found")
+        return page
+
+    @app.get("/task-artwork/{name}")
+    async def task_artwork(name: str):
+        image = (TASK_ARTWORK_DIR / name).resolve()
+        if image.parent != TASK_ARTWORK_DIR or image.suffix.lower() not in TASK_ARTWORK_SUFFIXES or not image.is_file():
+            raise HTTPException(status_code=404, detail="Task artwork not found")
+        if image.suffix.lower() == ".png":
+            return Response(_task_artwork_png(image, image.stat().st_mtime_ns), media_type="image/png")
+        return FileResponse(image)
 
     @app.get("/api/settings")
     async def settings():
@@ -1503,9 +1722,9 @@ def create_web_app(config, ok_instance=None):
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/api/settings/{group}/reset")
-    async def reset_settings(group: str):
+    async def reset_settings(group: str, section: str | None = None):
         try:
-            return await asyncio.to_thread(runtime.reset_settings, group)
+            return await asyncio.to_thread(runtime.reset_settings, group, section)
         except (ValueError, RuntimeError, StopIteration) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1555,12 +1774,17 @@ def create_web_app(config, ok_instance=None):
         return runtime.stop_task()
 
     @app.websocket("/api/events")
-    async def events(websocket: WebSocket, session_key: str = ""):
+    async def events(websocket: WebSocket, session_key: str = "", client_id: str = ""):
         await websocket.accept()
         if (not EVENT_SESSION_KEY_PATTERN.fullmatch(session_key)
                 or not secrets.compare_digest(session_key, runtime.event_session_key)):
             await websocket.close(code=1008, reason="A valid event session key is required")
             return
+        if client_id:
+            if not EVENT_SESSION_KEY_PATTERN.fullmatch(client_id):
+                await websocket.close(code=1008, reason="Invalid client identifier")
+                return
+            session_key = f"{session_key}/{client_id}"
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[EventMessage | None] = asyncio.Queue(maxsize=200)
 
@@ -1616,6 +1840,16 @@ def create_web_app(config, ok_instance=None):
                     "args": _json_value(message.args),
                     "kwargs": _json_value(message.kwargs),
                 }
+                if message.name == "log":
+                    from .desktop_tools import redact_log_message
+
+                    args = message.args
+                    payload["args"] = (
+                        [args[0], redact_log_message(args[1])]
+                        if len(args) == 2 and isinstance(args[0], int) and isinstance(args[1], str)
+                        else []
+                    )
+                    payload["kwargs"] = {}
                 if message.name in {
                     "adb_devices", "executor_paused", "starting_emulator",
                     "task", "task_list_updated",

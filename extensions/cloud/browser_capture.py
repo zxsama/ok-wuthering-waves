@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from threading import Lock
 from typing import Any
 
 import cv2
@@ -67,6 +68,7 @@ class PlaywrightBrowserCapture:
             page_or_call if callable(page_or_call) else lambda callback: callback(self.page)
         )
         self._size = (width, height)
+        self._frame_lock = Lock()
         self.black_pixel_threshold = black_pixel_threshold
         self.black_ratio_threshold = black_ratio_threshold
         self.static_difference_threshold = static_difference_threshold
@@ -101,10 +103,14 @@ class PlaywrightBrowserCapture:
         except Exception:
             return False
 
-    def get_frame(self) -> np.ndarray | None:
-        """Return the latest frame using the ok-script capture-method shape."""
-
-        return self.do_get_frame()
+    def get_frame(self, busy_wait: float = 0) -> np.ndarray | None:
+        """Allow one frame request at a time, waiting up to busy_wait for its turn."""
+        if not self._frame_lock.acquire(timeout=max(0, busy_wait)):
+            return None
+        try:
+            return self.do_get_frame()
+        finally:
+            self._frame_lock.release()
 
     def do_get_frame(self) -> np.ndarray | None:
         page_call = self._page_call

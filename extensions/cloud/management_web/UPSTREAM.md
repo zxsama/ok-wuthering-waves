@@ -12,8 +12,9 @@ Original paths: `ok/ui/web/app.py`, `ok/ui/web/requirements.py`,
 `ok/ui/web/static/*`, and `ok/task/web.py` (now `task_tabs.py`).
 The bundled upstream license is retained in `LICENSE.upstream.txt`.
 
-Local changes: relative imports; explicit FastAPI/Uvicorn dependencies;
-WebCustomTab event publishing through the current core event bus.
-The Tasks page lists all visible one-time tasks, including grouped tasks;
-individual group navigation continues to filter by group name.
-Only the cloud extension imports this package; no `ok` namespace aliases are installed.
+The cloud workspace maps the ok-script 3.0.7 Qt run bar, navigation and task
+pages to browser controls. `static/workspace.js` owns routing, runtime events,
+theme and navigation. `static/app.js` exports the retained React panels for
+schedules, settings, scripts, templates, about and task-owned tabs. Its schedule
+forms persist the cloud email-report option. See `static/workspace_panels.js`
+for their integration. The package only uses the installed 3.0.7 runtime.
